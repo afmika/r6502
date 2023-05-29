@@ -75,7 +75,7 @@ impl AsmLexer {
                 prog.push(Token::OP(self.consume_operand()?));
             }
         }
-
+        prog.push(Token::EOF);
         Ok(prog)
     }
 
