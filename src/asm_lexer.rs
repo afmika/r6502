@@ -10,7 +10,6 @@ pub enum Token {
 
 #[derive(Debug, Clone)]
 pub enum Operand {
-    NONE,               // example: INX (increment X)
     X, Y, A,            // registers, accumulator
     LABEL(String),      // (.*)
     ADDR(String),       // $XXXX
@@ -67,7 +66,7 @@ impl AsmLexer {
                 continue;
             }
 
-            // whitespace
+            // operands
             prog.push(Token::OP(self.consume_operand()?));
             self.consume_whitespace().ok();
             if c == ',' {
