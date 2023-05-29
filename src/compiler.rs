@@ -1,17 +1,13 @@
 use std::path::PathBuf;
 
-pub struct Compiler { 
-    as_text: bool
-}
+pub struct Compiler { }
 
 impl Compiler {
     pub fn new() -> Self {
-        Self {
-            as_text: false
-        }
+        Self {}
     }
 
     pub fn write(path: PathBuf) {
-        println!("{} bytes written", 0);
+        println!("{} bytes written to {:?}", 0, path);
     }
 }

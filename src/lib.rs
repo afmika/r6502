@@ -1,5 +1,5 @@
 pub mod compiler;
-pub mod asm_parser;
+pub mod asm_lexer;
 
 #[cfg(test)]
 mod tests;
