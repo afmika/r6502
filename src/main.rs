@@ -14,16 +14,16 @@ fn main() {
         ldx #$10 ; 10-th term
         stx $26
         :start
-            txa $PLACEHOLDER
-            lda $24 ; load the first op
+            txa
+            lda $26 ; load the first op
             adc $25 ; add the first op to the second
-            sta $24 ; store the result in $0024 to replace the old first op
+            sta #$24 ; store the result in $0024 to replace the old first op
             ldx $25
-            inx $PLACEHOLDER ; new second op
+            inx ; new second op
             stx $25
             cpx $26
             bne start  ; USES LABEL
-            ; brk
+            brk
     "));
     let res = lexer.tokenize();
     match res {

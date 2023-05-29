@@ -1,7 +1,7 @@
 #[derive(Debug, Clone)]
 pub enum Token {
     LITERAL(String),    // [\w]+ 
-    WHITESPACE(char),   // \s | \t | \n
+    WHITESPACE,         // \s | \t | \n
     COMM(String),       // ;(.*)
     LABEL(String),      // :[\w]+
     OP(Operand),
@@ -39,8 +39,9 @@ impl AsmLexer {
         self.cursor = 0;
         loop {
             // cleanup
-            self.consume_comment().ok();
             self.consume_whitespace().ok();
+            self.consume_comment().ok();
+
             if self.is_eof() {
                 break;
             }
@@ -57,29 +58,22 @@ impl AsmLexer {
             if c.is_alphanumeric() {
                 let ins = self.consume_instr()?;
                 prog.push(ins);
+                continue;
+            }
 
-                let endline = self.consume_whitespace().ok();
+            // op1, op2 | ; ... | \n
+            if self.is_endline() {
+                self.next();
+                continue;
+            }
 
-                match endline {
-                    Some(Token::WHITESPACE(s)) => {
-                        if s == '\n' {
-                            continue;
-                        }
-                    }
-                    _ => { }
-                }
-                assert!(*self.curr() != ',');
-                // op1, op2 | ; ... | \n
-                if c != ';' && !self.is_endline() {
-                    // whitespace
-                    prog.push(Token::OP(self.consume_operand()?));
-                    self.consume_whitespace().ok();
-                    if c == ',' {
-                        self.next();
-                        self.consume_whitespace().ok();
-                        prog.push(Token::OP(self.consume_operand()?));
-                    }
-                }
+            // whitespace
+            prog.push(Token::OP(self.consume_operand()?));
+            self.consume_whitespace().ok();
+            if c == ',' {
+                self.next();
+                self.consume_whitespace().ok();
+                prog.push(Token::OP(self.consume_operand()?));
             }
         }
 
@@ -163,12 +157,8 @@ impl AsmLexer {
             self.next();
         }
 
-        if s.chars().last().unwrap_or('\0') == '\n' {
-            return Ok(Token::WHITESPACE('\n'))
-        }
-
         if s.len() > 0 {
-            return Ok(Token::WHITESPACE(' '));
+            return Ok(Token::WHITESPACE);
         }
 
         Err(format!("whitespace was expected, got '{}'", self.curr()))
@@ -190,7 +180,13 @@ impl AsmLexer {
             'Y' => Ok(Operand::Y),
             'A' => Ok(Operand::A),
             '(' => Ok(self.consume_wrapped_mode()?),
-            _ => Ok(Operand::LABEL(s))   
+            _ => {
+                let res = format!("{}{}", prefix, s);
+                if prefix.is_alphabetic() {
+                    return Ok(Operand::LABEL(res))
+                }
+                Err(format!("address or alphanumeric expected, got {}", res))
+            }
         }
     }
 
