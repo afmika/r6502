@@ -18,8 +18,8 @@ impl PartialEq for Token {
 pub enum Operand {
     X, Y, A,            // registers, accumulator
     LABEL(String),      // (.*)
-    ADDR(String),       // $XXXX
-    IMM(Box<Operand>),  // #value, #$ADDR
+    HEX(String),        // $XXXX
+    IMM(Box<Operand>),  // #value, #$HEX
     ABS(Box<Operand>),  // ( (\$|#|$)[0-9]{2,8} | label )
 }
 
@@ -186,7 +186,7 @@ impl AsmLexer {
 
         let s = self.consume_alphanum()?;
         match prefix {
-            '$' => Ok(Operand::ADDR(s)),
+            '$' => Ok(Operand::HEX(s)),
             'X' => Ok(Operand::X),
             'Y' => Ok(Operand::Y),
             'A' => Ok(Operand::A),
@@ -196,7 +196,7 @@ impl AsmLexer {
                 if prefix.is_alphabetic() {
                     return Ok(Operand::LABEL(res))
                 }
-                Err(format!("address or alphanumeric expected, got {}", res))
+                Err(format!("HEXess or alphanumeric expected, got {}", res))
             }
         }
     }

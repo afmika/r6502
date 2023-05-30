@@ -21,15 +21,15 @@ mod tests {
             Token::LABEL("label".to_string()),
 
             Token::LITERAL("lda".to_string()), 
-            Token::OP(Operand::IMM(Box::new(Operand::ADDR("01".to_string())))), 
+            Token::OP(Operand::IMM(Box::new(Operand::HEX("01".to_string())))), 
             
             Token::LITERAL("sta".to_string()), 
-            Token::OP(Operand::ADDR("24".to_string())), 
+            Token::OP(Operand::HEX("24".to_string())), 
 
             Token::LITERAL("lda".to_string()), 
-            Token::OP(Operand::IMM(Box::new(Operand::ADDR("02".to_string())))), 
+            Token::OP(Operand::IMM(Box::new(Operand::HEX("02".to_string())))), 
 
-            Token::LITERAL("sta".to_string()), Token::OP(Operand::ADDR("25".to_string())),
+            Token::LITERAL("sta".to_string()), Token::OP(Operand::HEX("25".to_string())),
 
             // Token::LITERAL("lda".to_string()), 
             // Token::OP(Operand::X), 
