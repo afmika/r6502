@@ -1,3 +1,5 @@
+use std::cmp::min;
+
 #[derive(Debug, Clone, Eq)]
 pub enum Token {
     LITERAL(String),    // [\w]+ 
@@ -16,11 +18,11 @@ impl PartialEq for Token {
 
 #[derive(Debug, Clone, Eq)]
 pub enum Operand {
-    X, Y, A,            // registers, accumulator
-    LABEL(String),      // (.*)
+    LITERAL(String),    // (.*)
     HEX(String),        // $XXXX
     IMM(Box<Operand>),  // #value, #$HEX
     ABS(Box<Operand>),  // ( (\$|#|$)[0-9]{2,8} | label )
+    PAIR(Box<Operand>, Box<Operand>)
 }
 
 impl PartialEq for Operand {
@@ -50,42 +52,41 @@ impl AsmLexer {
         self.cursor = 0;
         loop {
             // cleanup
-            self.consume_whitespace().ok();
-            self.consume_comment().ok();
-
             if self.is_eof() {
                 break;
             }
 
             let c = *self.curr();
 
-            // label
-            if c == ':' {
-                prog.push(self.consume_label()?);
+            if c.is_whitespace() {
+                self.consume_whitespace()?;
                 continue;
             }
 
-            // instruction
+            if c == ';' {
+                self.consume_comment()?;
+                continue;
+            }
+
+            // label, instruction
             if c.is_alphanumeric() {
-                let ins = self.consume_instr()?;
-                prog.push(ins);
-                continue;
-            }
-
-            // op1, op2 | ; ... | \n
-            if self.is_endline() {
-                self.next();
+                let tk = self.consume_literal()?;
+                if *self.curr() == ':' {
+                    self.consume(":")?;
+                    match tk {
+                        Token::LITERAL(s) => {
+                            prog.push(Token::LABEL(s))
+                        },
+                        _ => {}
+                    }
+                } else {
+                    prog.push(tk);
+                }
                 continue;
             }
 
             // operands
-            prog.push(Token::OP(self.consume_operand()?));
-            self.consume_whitespace().ok();
-            if c == ',' {
-                self.next();
-                self.consume_whitespace().ok();
-                prog.push(Token::OP(self.consume_operand()?));
-            }
+            prog.push(self.consume_right_side()?);
         }
         prog.push(Token::EOF);
         Ok(prog)
@@ -112,25 +113,51 @@ impl AsmLexer {
     }
 
     fn next(&mut self) -> &char {
-        self.cursor += 1;
+        self.cursor = min(self.source.len(), self.cursor + 1);
         return self.curr();
     }
 
-    fn consume_instr(&mut self) -> Result<Token, String> {
+    fn prev(&mut self) -> &char {
+        if self.cursor > 0 {
+            self.cursor -= 1;
+        }
+        return self.curr();
+    }
+
+    fn consume(&mut self, s: &str) -> Result<Token, String> {
+        for c in s.chars() {
+            if *self.curr() != c {
+                return Err(format!("'{}' was expected, got '{}'", c, *self.curr()));
+            }
+            self.next();
+        }
+        Ok(Token::LITERAL(s.to_string()))
+    }
+
+    fn consume_literal(&mut self) -> Result<Token, String> {
         self.consume_alphanum()
             .map(|tk| Token::LITERAL(tk))
     }
 
-    fn consume_label(&mut self) -> Result<Token, String> {
-        let c = *self.curr();
-        self.next();
-
-        // label
-        if c == ':' {
-            let value = self.consume_alphanum()?;
-            Ok(Token::LABEL(value))
-        } else {
-            Err("':' was expected".to_string())
+    fn consume_right_side(&mut self) -> Result<Token, String> {
+        match self.consume_operand() {
+            Ok(left) => {
+                self.consume_whitespace().ok();
+                if *self.curr() == ',' {
+                    self.consume(",")?;
+                    self.consume_whitespace().ok();
+                    let right = self.consume_operand()?;
+                    let pairs = Operand::PAIR(
+                        Box::new(left), 
+                        Box::new(right)
+                    );
+                    self.consume_whitespace().ok();
+                    self.consume_comment().ok();
+                    return Ok(Token::OP(pairs));
+                }
+                return Ok(Token::OP(left));
+            },
+            Err(e) => Err(e)
         }
     }
 
@@ -149,7 +176,8 @@ impl AsmLexer {
 
     fn consume_alphanum(&mut self) -> Result<String, String> {
         let mut tk = String::from("");
-        while self.curr().is_alphanumeric() {
+        
+        while self.curr().is_alphanumeric() || "_.".contains(*self.curr()) {
             tk.push(*self.curr());
             self.next();
         }
@@ -172,7 +200,7 @@ impl AsmLexer {
             return Ok(Token::WHITESPACE);
         }
 
-        Err(format!("whitespace was expected, got '{}'", self.curr()))
+        Err(format!("whitespace or newline was expected, got '{}'", self.curr()))
     }
 
     fn consume_operand(&mut self) -> Result<Operand, String> {
@@ -184,34 +212,28 @@ impl AsmLexer {
             return Ok(Operand::IMM(Box::new(op)));
         }
 
-        let s = self.consume_alphanum()?;
-        match prefix {
-            '$' => Ok(Operand::HEX(s)),
-            'X' => Ok(Operand::X),
-            'Y' => Ok(Operand::Y),
-            'A' => Ok(Operand::A),
-            '(' => Ok(self.consume_wrapped_mode()?),
-            _ => {
-                let res = format!("{}{}", prefix, s);
-                if prefix.is_alphabetic() {
-                    return Ok(Operand::LABEL(res))
-                }
-                Err(format!("HEXess or alphanumeric expected, got {}", res))
-            }
+        if prefix == '(' {
+            self.prev();
+            return Ok(self.consume_wrapped_mode()?);
         }
+
+        if prefix == '$' {
+            return Ok(Operand::HEX(self.consume_alphanum()?));
+        }
+        
+        // unconsume prefix
+        self.prev();
+
+        if prefix.is_alphanumeric() {
+            return Ok(Operand::LITERAL(self.consume_alphanum()?))
+        }
+        Err(format!("HEX or alphanumeric expected, got '{}'", prefix))
     }
 
     fn consume_wrapped_mode(&mut self) -> Result<Operand, String> {
-        if *self.curr() != '(' {
-            return Err("'(' was expected".to_string());
-        }
-        self.next();
-
+        self.consume("(")?;
         let op = self.consume_operand();
-        if *self.curr() != ')' {
-            return Err("')' was expected".to_string());
-        }
-        self.next();
+        self.consume(")")?;
 
         op.map(|o| Operand::ABS(Box::new(o)))
     }
