@@ -162,10 +162,7 @@ impl AsmLexer {
     }
 
     fn consume_comment(&mut self) -> Result<Token, String> {
-        if *self.curr() != ';' {
-            return Err("';' was expected".to_string());
-        }
-        self.next();
+        self.consume(";")?;
 
         let mut tk = String::from("");
         while !self.is_endline() && !self.is_eof() {
@@ -212,17 +209,16 @@ impl AsmLexer {
             return Ok(Operand::IMM(Box::new(op)));
         }
 
-        if prefix == '(' {
-            self.prev();
-            return Ok(self.consume_wrapped_mode()?);
-        }
-
         if prefix == '$' {
             return Ok(Operand::HEX(self.consume_alphanum()?));
         }
         
         // unconsume prefix
         self.prev();
+
+        if prefix == '(' {
+            return Ok(self.consume_wrapped_mode()?);
+        }
 
         if prefix.is_alphanumeric() {
             return Ok(Operand::LITERAL(self.consume_alphanum()?))
