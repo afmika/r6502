@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq)]
 pub enum Token {
     LITERAL(String),    // [\w]+ 
     WHITESPACE,         // \s | \t | \n
@@ -8,13 +8,25 @@ pub enum Token {
     EOF
 }
 
-#[derive(Debug, Clone)]
+impl PartialEq for Token {
+    fn eq(&self, other: &Self) -> bool {
+        format!("{:?}", self) == format!("{:?}", other)
+    }
+}
+
+#[derive(Debug, Clone, Eq)]
 pub enum Operand {
     X, Y, A,            // registers, accumulator
     LABEL(String),      // (.*)
     ADDR(String),       // $XXXX
     IMM(Box<Operand>),  // #value, #$ADDR
     ABS(Box<Operand>),  // ( (\$|#|$)[0-9]{2,8} | label )
+}
+
+impl PartialEq for Operand {
+    fn eq(&self, other: &Self) -> bool {
+        format!("{:?}", self) == format!("{:?}", other)
+    }
 }
 
 pub struct AsmLexer {
