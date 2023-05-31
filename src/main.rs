@@ -1,44 +1,34 @@
-use r6502::asm_lexer::AsmLexer;
+use r6502::asm_lexer::{AsmLexer, Token};
 
 fn main() {
     let mut lexer = AsmLexer::new(&String::from(r"
+        ;some comments
         LDX #0
+        .start
+        .proc
         LOOP:
-        LDA $FE
-        STA $200,X
-        INX
-        CPX #0
-        BEQ LOOP2
-        JMP LOOP
-        LOOP2:
-        LDA $FE
-        STA $300,X
-        INX
-        CPX #0
-        BEQ LOOP3
-        JMP LOOP2
-        LOOP3:
-        LDA $FE
-        STA $400,X
-        INX
-        CPX #0
-        BEQ LOOP4
-        JMP LOOP3
-        LOOP4:
-        LDA $FE
-        STA #$500,X
-        INX
-        CPX #0
-        BEQ LOOP
-        JMP LOOP4
-    "));
+            LDA #$FE ; another comment
+            STA $200, X
+            INX 
+            INX2
+            CPX %123 ; another
+            BEQ LOOP
+        .endproc
+        "
+        )
+    );
     let res = lexer.tokenize();
     match res {
         Ok(v) => {
             for token in v.iter() {
-                println!("{:?}", token);
+                print!(" {:?}", token);
+                match token {
+                    Token::NEWLINE => {
+                        println!() 
+                    },
+                    _ => {},
+                }
             }
-            println!("Done");
         },
         Err(e) => println!("error {}", e)
     }
