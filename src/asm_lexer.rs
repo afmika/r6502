@@ -90,14 +90,14 @@ impl AsmLexer {
         Ok(prog)
     }
 
-    fn curr(&mut self) -> &char {
+    fn curr(&self) -> &char {
         self
             .source
             .get(self.cursor)
             .unwrap_or(&'\0')
     }
 
-    fn is_bin(&mut self) -> bool {
+    fn is_bin(&self) -> bool {
         *self.curr() == '0' || *self.curr() == '1'
     }
 
@@ -108,16 +108,16 @@ impl AsmLexer {
         || c >= 'A' && c <= 'F'
     }
 
-    fn is_eof(&mut self) -> bool {
+    fn is_eof(&self) -> bool {
         *self.curr() == '\0'
     }
 
-    fn is_endline(&mut self) -> bool {
+    fn is_endline(&self) -> bool {
         let c = *self.curr();
         self.is_eof() || c == '\n' || c == '\r'
     }
 
-    fn is_literal(&mut self) -> bool {
+    fn is_literal(&self) -> bool {
         self.curr().is_alphanumeric() || "_.".contains(*self.curr())
     }
 
@@ -126,9 +126,9 @@ impl AsmLexer {
         return self.curr();
     }
 
-    fn prev(&mut self) -> &char {
-        return self.back(1);
-    }
+    // fn prev(&mut self) -> &char {
+    //     return self.back(1);
+    // }
 
     fn back(&mut self, count: usize) -> &char {
         if self.cursor > (count - 1) {
