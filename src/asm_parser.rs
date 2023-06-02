@@ -3,7 +3,7 @@ use std::cmp::min;
 use crate::asm_lexer::Token;
 
 // https://famicom.party/book/05-6502assembly/
-#[derive(Debug, Clone, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
     MAIN,
     PROC,
@@ -12,14 +12,7 @@ pub enum Expr {
     INSTR(String, Operand),
 }
 
-impl PartialEq for Expr {
-    fn eq(&self, other: &Self) -> bool {
-        format!("{:?}", self) == format!("{:?}", other)
-    }
-}
-
-
-#[derive(Debug, Clone, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Operand {
     NONE,               // implied
     IMM(Box<Operand>),       // immediate
@@ -28,12 +21,6 @@ pub enum Operand {
     PAIR(Box<Operand>, Box<Operand>),
     HEX(String),
     BIN(String)
-}
-
-impl PartialEq for Operand {
-    fn eq(&self, other: &Self) -> bool {
-        format!("{:?}", self) == format!("{:?}", other)
-    }
 }
 
 pub struct AsmParser<'a> {
@@ -64,7 +51,7 @@ impl<'a> AsmParser<'a> {
                 Token::PROC => prog.push(Expr::PROC),
                 Token::END => prog.push(Expr::END),
                 Token::COMMENT(_) => {},
-                any => {
+                _ => {
                     prog.push(self.state_instr()?);
                     continue;
                 }
