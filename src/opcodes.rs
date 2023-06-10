@@ -66,10 +66,11 @@ impl Opcode {
     }
 }
 
+
+// https://github.com/afmika/opcodes-json-6502
 lazy_static! {
     #[rustfmt::skip]
     pub static ref OPCODES: HashMap<Opcode, u8> = HashMap::from([
-        // todo
         (Opcode::new(Instr::BRK, AdrMode::IMPL, vec!["BRK".to_string()]), 0x00),
 
         (Opcode::new(Instr::ORA, AdrMode::INDX, vec!["ORA ($44,X)".to_string()]), 0x01),
