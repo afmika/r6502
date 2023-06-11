@@ -25,20 +25,25 @@ use crate::opcodes::{
 // https://famicom.party/book/05-6502assembly/
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
-    MAIN,
-    PROC,
-    END,
-    ASSIGN(String, String),
-    LABEL(String),
-    INSTR(Instr, AdrMode, Operand),
+    DIRECTIVE(Directive),
+    ASSIGN(Token, Operand), // lit, value
+    LABEL(Token),
+    INSTR(Instr, AdrMode, Operand)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Operand {
-    LABEL,              // jumps
-    NONE,
-
+    NONE,               // implied
+    VALUE(Token)       // label, variable, 1 or 2 bytes hex/dec/bin
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Directive {
+    ORG, PROC, MAIN, END,
+    EXPORT, SEGMENT,
+    WORD, DB
+}
+
 
 pub struct AsmParser<'a> {
     tokens: &'a Vec<Token>,
@@ -140,7 +145,7 @@ impl<'a> AsmParser<'a> {
     // }
 
     fn state_operand(&self) -> Result<Operand, String> {
-        Ok(Operand::LABEL)
+        Ok(Operand::VALUE(Token::BIN("1234".to_string())))
     }
 
 }

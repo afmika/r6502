@@ -2,7 +2,6 @@ use lazy_static::lazy_static;
 use std::collections::HashMap;
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
-
 pub enum AdrMode {
     IMPL, IMM, ABS,
     ABSX, ABSY,
