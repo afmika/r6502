@@ -15,6 +15,7 @@ pub enum Token {
     PARENTCLOSE,        // )
     NEWLINE,            // \n | \r\n
     HASH,               // #
+    DEC(String),
     HEX(String),        // \$[0-9abdef]+
     BIN(String),        // %[01]+
     EOF
@@ -51,12 +52,12 @@ impl AsmLexer {
                 break;
             }
 
-            if self.is_literal() {
+            if self.is_literal() && !self.is_dec() {
                 let lit = self.consume_literal()?;
                 match lit {
                     Token::LITERAL(s) => {
                         self.back(s.len());
-                        prog.push(self.consume(&s, None)?);                     
+                        prog.push(self.consume(&s, None)?);
                     },
                     _ => {}
                 }
@@ -80,6 +81,9 @@ impl AsmLexer {
                 '\r' => self.consume_endlines(),
                 '$' => self.consume_hex(),
                 '%' => self.consume_bin(),
+                '0' | '1' | '2' | '3' |
+                '4' | '5' | '6' | '7'  |
+                '8' | '9' => self.consume_dec(),
                 _ => {
                     return Err(format!("{:?} is not a supported character", c));
                 }
@@ -99,6 +103,10 @@ impl AsmLexer {
 
     fn is_bin(&self) -> bool {
         *self.curr() == '0' || *self.curr() == '1'
+    }
+
+    fn is_dec(&self) -> bool {
+        *self.curr() >= '0' && *self.curr() <= '9'
     }
 
     fn is_hex(&mut self) -> bool {
@@ -182,6 +190,15 @@ impl AsmLexer {
             return Err(format!("8 bits binary was expected, got '%{}'", s));
         }
         Ok(Token::BIN(s))
+    }
+
+    fn consume_dec(&mut self) -> Result<Token, String> {
+        let mut s = String::from("");
+        while self.is_dec() {
+            s.push(*self.curr());
+            self.next();
+        }
+        Ok(Token::DEC(s))
     }
 
     fn consume_whitespaces(&mut self) -> Result<(), String> {

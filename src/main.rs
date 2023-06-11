@@ -8,7 +8,8 @@ fn main() {
         .proc
         LOOP:
             LDA #$FE ; another comment
-            STA $200, X
+            STA $200
+            STA 1234
             INX 
             INX2
             CPX %123 ; another

@@ -10,6 +10,8 @@ mod tests {
                 INSTR_A (#$ABC), F
                 INSTR_B
                 INSTR_C %001
+                INSTR_D 123456
+                INSTR_E %0
         "));
         let res = lexer.tokenize();
         let tokens = vec![
@@ -21,7 +23,11 @@ mod tests {
             Token::LITERAL("F".to_string()), Token::NEWLINE,
 
             Token::LITERAL("INSTR_B".to_string()), Token::NEWLINE,
-            Token::LITERAL("INSTR_C".to_string()), Token::BIN("001".to_string()), Token::EOF
+            Token::LITERAL("INSTR_C".to_string()), Token::BIN("001".to_string()), Token::NEWLINE,
+
+            Token::LITERAL("INSTR_D".to_string()), Token::DEC("123456".to_string()), Token::NEWLINE,
+            Token::LITERAL("INSTR_E".to_string()), Token::BIN("0".to_string()),
+            Token::EOF
         ];
         assert_eq!(res.unwrap(), tokens);
     }
