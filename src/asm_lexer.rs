@@ -3,11 +3,8 @@ use std::cmp::min;
 // https://famicom.party/book/05-6502assembly/
 #[derive(Debug, Clone, Eq)]
 pub enum Token {
-    MAIN,               // main
-    PROC,               // proc
-    END,                // .endproc
-
-    LITERAL(String),    // [\w_.]+ 
+    DIRECTIVE(String),          // .LITERAL
+    LITERAL(String),    // [\w_]+ 
     COMMENT(String),    // ;(.*)\n
     COMMA,              // ,
     COLON,              // :
@@ -52,7 +49,7 @@ impl AsmLexer {
                 break;
             }
 
-            if self.is_literal() && !self.is_dec() {
+            if self.is_literal() && !self.is_dec() && *self.curr() != '.' {
                 let lit = self.consume_literal()?;
                 match lit {
                     Token::LITERAL(s) => {
@@ -71,6 +68,7 @@ impl AsmLexer {
             }
 
             let res = match c {
+                '.' => self.consume_directive(),
                 ')' => self.consume(")", Some(Token::PARENTCLOSE)),
                 '(' => self.consume("(", Some(Token::PARENTOPEN)),
                 '#' => self.consume("#", Some(Token::HASH)),
@@ -156,14 +154,20 @@ impl AsmLexer {
         if ret.is_some() {
             return Ok(ret.unwrap());
         }
+        Ok(Token::LITERAL(s.to_string()))
+    }
 
-        let out = match s {
-            "main" => Token::MAIN,
-            ".proc" => Token::PROC,
-            ".endproc" => Token::END,
-            _ => Token::LITERAL(s.to_string())
-        };
-        Ok(out)
+    fn consume_directive(&mut self) -> Result<Token, String> {
+        self.consume(".", None)?;
+        match self.consume_literal() {
+            Ok(lit) => {
+                match lit {
+                    Token::LITERAL(s) => Ok(Token::DIRECTIVE(s)),
+                    tk =>  panic!("literal was expected after '.', got {:?}", tk)
+                }
+            },
+            Err(e) => Err(e)
+        }
     }
 
     fn consume_hex(&mut self) -> Result<Token, String> {

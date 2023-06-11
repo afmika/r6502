@@ -1,6 +1,26 @@
 use std::cmp::min;
 
 use crate::asm_lexer::Token;
+use crate::opcodes::{
+    Instr,
+    AdrMode
+};
+
+/**
+ * * decimal
+ * @TODOS
+ * 0. start at an offset
+ * ORG $0080
+ * AND other compiler directive
+ * 
+ * 1. store variables, and strings
+ * SRC     .WORD $0400     ;source string pointer
+ * MY_STR  .
+ * 
+ * 2. in place operations and support of chars
+ * CMP #'A'
+ * CMP #'Z'+1
+ */
 
 // https://famicom.party/book/05-6502assembly/
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -8,19 +28,16 @@ pub enum Expr {
     MAIN,
     PROC,
     END,
+    ASSIGN(String, String),
     LABEL(String),
-    INSTR(String, Operand),
+    INSTR(Instr, AdrMode, Operand),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Operand {
-    NONE,               // implied
-    IMM(Box<Operand>),       // immediate
-    X, Y, A,            // registers
     LABEL,              // jumps
-    PAIR(Box<Operand>, Box<Operand>),
-    HEX(String),
-    BIN(String)
+    NONE,
+
 }
 
 pub struct AsmParser<'a> {
@@ -47,12 +64,9 @@ impl<'a> AsmParser<'a> {
             let token = self.curr();
 
             match token {
-                Token::MAIN => prog.push(Expr::MAIN),
-                Token::PROC => prog.push(Expr::PROC),
-                Token::END => prog.push(Expr::END),
                 Token::COMMENT(_) => {},
                 _ => {
-                    prog.push(self.state_instr()?);
+                    // prog.push(self.state_instr()?);
                     continue;
                 }
             };
@@ -104,29 +118,29 @@ impl<'a> AsmParser<'a> {
         Err(format!("{:?} was expected", token))
     }
 
-    fn state_instr(&mut self) -> Result<Expr, String> {
-        // label
-        if *self.peek_next() == Token::COLON {
-            match self.curr() {
-                Token::LITERAL(s) => {
-                    return Ok(Expr::LABEL(s.to_string()));
-                },
-                _ => {}
-            }
-        }
+    // fn state_instr(&mut self) -> Result<Expr, String> {
+    //     // label
+    //     if *self.peek_next() == Token::COLON {
+    //         match self.curr() {
+    //             Token::LITERAL(s) => {
+    //                 return Ok(Expr::LABEL(s.to_string()));
+    //             },
+    //             _ => {}
+    //         }
+    //     }
 
-        // instr
-        match self.curr() {
-            Token::LITERAL(s) => {
-                let op = self.state_operand()?;
-                Ok(Expr::INSTR(s.to_string(), op))
-            },
-            any => Err(format!("{:?} unexpected", any))
-        }
-    }
+    //     // instr
+    //     match self.curr() {
+    //         Token::LITERAL(s) => {
+    //             let op = self.state_operand()?;
+    //             Ok(Expr::INSTR(s.to_string(), op))
+    //         },
+    //         any => Err(format!("{:?} unexpected", any))
+    //     }
+    // }
 
     fn state_operand(&self) -> Result<Operand, String> {
-        Ok(Operand::A)
+        Ok(Operand::LABEL)
     }
 
 }

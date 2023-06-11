@@ -41,8 +41,8 @@ mod tests {
         let res = lexer.tokenize();
 
         let tokens = vec![
-            Token::PROC,
-            Token::LITERAL(".procend".to_string()), Token::LITERAL(".main".to_string()), 
+            Token::DIRECTIVE("proc".to_string()),
+            Token::DIRECTIVE("procend".to_string()), Token::DIRECTIVE("main".to_string()), 
             Token::LITERAL("some._literal".to_string()), Token::COMMENT(" then comments".to_string()), Token::NEWLINE,
             Token::HEX("ff01".to_string()), Token::BIN("00010".to_string()), Token::COMMA, Token::COLON,
             Token::EOF
