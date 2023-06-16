@@ -34,7 +34,13 @@ pub enum Expr {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Operand {
     NONE,               // implied
-    VALUE(Token)       // label, variable, 1 or 2 bytes hex/dec/bin
+    EXPR(MathExpr)      // label, variable, 1 or 2 bytes hex/dec/bin
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MathExpr {
+    PLUS, MINUS, MULT, DIV,
+    PLACEHOLDER(String), NUM(NumericValue)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,6 +50,42 @@ pub enum Directive {
     SEGMENT(Token),                       // .segment "NAME"
     BYTE(Vec<Token>),                     // .byte 1, 2, 3, ... (8 bits dec, bin or hex) or even strings
     ENDMACRO, MACRO(Token, Vec<Token>)    // .macro NAME arg1 arg2 ... argN (.*)\n endmacro
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NumericValue {
+    value: u32,
+    size: u32
+}
+
+pub fn canonicalize_number(n: &Token) -> Result<NumericValue, String> {
+    match n {
+        Token::BIN(bin) => {
+            let value: u32 = u32::from_str_radix(bin, 2).unwrap();
+            if bin.len() > 8 {
+                return Ok(NumericValue { value, size: 16 })
+            }
+            Ok(NumericValue { value, size: 8 })
+        },
+        Token::DEC(dec) => {
+            let value: u32 = u32::from_str_radix(dec, 10).unwrap();
+            // ex: 256 or 00001 shall be considered as 16 bits
+            if value > 255 || dec.len() > 3 {
+                return Ok(NumericValue { value, size: 16 })
+            }
+            Ok(NumericValue { value, size: 8 })
+        },
+        Token::HEX(hex) => {
+            let value: u32 = u32::from_str_radix(hex, 16).unwrap();
+            if hex.len() > 2 {
+                return Ok(NumericValue { value, size: 16 })
+            }
+            Ok(NumericValue { value, size: 8 })
+        },
+        token => {
+            Err(format!("token {:?} is not a number", token))
+        }
+    }
 }
 
 
@@ -69,15 +111,8 @@ impl<'a> AsmParser<'a> {
                 break;
             }
             let token = self.curr();
-
-            match token {
-                Token::COMMENT(_) => {},
-                _ => {
-                    // prog.push(self.state_instr()?);
-                    continue;
-                }
-            };
-
+            let res = self.state_instr()?;
+            println!("{:?}", res);
             self.next();
         }
         Ok(prog)
@@ -122,32 +157,45 @@ impl<'a> AsmParser<'a> {
             self.next();
             return Ok(token);
         }
-        Err(format!("{:?} was expected", token))
+        Err(format!("{:?} was expected, got {:?} instead", token, *self.curr()))
     }
 
-    // fn state_instr(&mut self) -> Result<Expr, String> {
-    //     // label
-    //     if *self.peek_next() == Token::COLON {
-    //         match self.curr() {
-    //             Token::LITERAL(s) => {
-    //                 return Ok(Expr::LABEL(s.to_string()));
-    //             },
-    //             _ => {}
-    //         }
-    //     }
+    fn state_instr(&mut self) -> Result<Expr, String> {
+        let instr = self.curr();
+        self.next();
+        // [none ::= implied, accumulator]
+        // operand ::= none | imm | abs | ind | rel | zp
+        // imm     ::= #$BB
+        // abs     ::= $LLHH | $LLHH ',' ('x'|'y')
+        // ind     ::= '(' $LLHH ')' | '(' $BB ',' 'x' ')' | '(' $BB  ')' ',' 'y'
+        // rel     ::= $BB                                  (context bound: only for jumps BXX)
+        // zp      ::= $BB | $BB ',' ('x'|'y')
 
-    //     // instr
-    //     match self.curr() {
-    //         Token::LITERAL(s) => {
-    //             let op = self.state_operand()?;
-    //             Ok(Expr::INSTR(s.to_string(), op))
-    //         },
-    //         any => Err(format!("{:?} unexpected", any))
-    //     }
-    // }
+        if *self.curr() == Token::PARENTOPEN {
+            // indirect
+            self.consume(Token::PARENTOPEN)?;
+
+            let number = canonicalize_number(self.curr())?;
+            if number.size > 8 {
+                // indirect
+                let op = Operand::EXPR(MathExpr::NUM(number));
+                self.next();
+                self.consume(Token::PARENTCLOSE)?;
+                return Ok(Expr::INSTR(Instr::NOP, AdrMode::IND, op));
+            } else {
+                // indirect x
+                panic!("8 bits non implemented")
+            }
+        }
+        panic!("non implemented")
+    }
 
     fn state_operand(&self) -> Result<Operand, String> {
-        Ok(Operand::VALUE(Token::BIN("1234".to_string())))
+        Ok(Operand::NONE)
+    }
+
+    fn state_math_expr(&mut self) {
+
     }
 
 }

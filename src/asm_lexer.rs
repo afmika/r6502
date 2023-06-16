@@ -16,6 +16,7 @@ pub enum Token {
     MINUS,              // +
     MULT,               // *
     DIV,                // /
+    EQUAL,                // =
     DEC(String),        // [0-9]+
     HEX(String),        // \$[0-9abdef]+
     BIN(String),        // %[01]+
@@ -80,16 +81,15 @@ impl AsmLexer {
                 ':' => self.consume(":", Some(Token::COLON)),
                 '-' => self.consume("-", Some(Token::MINUS)),
                 '+' => self.consume("+", Some(Token::PLUS)),
-                '*' => self.consume("+", Some(Token::MULT)),
-                '/' => self.consume("+", Some(Token::DIV)),
+                '*' => self.consume("*", Some(Token::MULT)),
+                '/' => self.consume("/", Some(Token::DIV)),
+                '=' => self.consume("=", Some(Token::EQUAL)),
                 ';' => self.consume_comment(),
                 '\n' => self.consume_endlines(),
                 '\r' => self.consume_endlines(),
                 '$' => self.consume_hex(),
                 '%' => self.consume_bin(),
-                '0' | '1' | '2' | '3' |
-                '4' | '5' | '6' | '7'  |
-                '8' | '9' => self.consume_dec(),
+                '0' ..= '9' => self.consume_dec(),
                 _ => {
                     return Err(format!("{:?} is not a supported character", c));
                 }
