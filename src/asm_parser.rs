@@ -39,9 +39,11 @@ pub enum Operand {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Directive {
-    ORG, PROC, MAIN, END,
-    EXPORT, SEGMENT,
-    WORD, DB
+    EXPORT, INCLUDE(Token),
+    ENDPROC, PROC(Token),                 // .proc main 
+    SEGMENT(Token),                       // .segment "NAME"
+    BYTE(Vec<Token>),                     // .byte 1, 2, 3, ... (8 bits dec, bin or hex) or even strings
+    ENDMACRO, MACRO(Token, Vec<Token>)    // .macro NAME arg1 arg2 ... argN (.*)\n endmacro
 }
 
 

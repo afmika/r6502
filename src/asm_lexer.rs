@@ -3,7 +3,7 @@ use std::cmp::min;
 // https://famicom.party/book/05-6502assembly/
 #[derive(Debug, Clone, Eq)]
 pub enum Token {
-    DIRECTIVE(String),          // .LITERAL
+    DIRECTIVE(String),  // .LITERAL (.segment)
     LITERAL(String),    // [\w_]+ 
     COMMENT(String),    // ;(.*)\n
     COMMA,              // ,
@@ -12,7 +12,11 @@ pub enum Token {
     PARENTCLOSE,        // )
     NEWLINE,            // \n | \r\n
     HASH,               // #
-    DEC(String),
+    PLUS,               // -
+    MINUS,              // +
+    MULT,               // *
+    DIV,                // /
+    DEC(String),        // [0-9]+
     HEX(String),        // \$[0-9abdef]+
     BIN(String),        // %[01]+
     EOF
@@ -74,6 +78,10 @@ impl AsmLexer {
                 '#' => self.consume("#", Some(Token::HASH)),
                 ',' => self.consume(",", Some(Token::COMMA)),
                 ':' => self.consume(":", Some(Token::COLON)),
+                '-' => self.consume("-", Some(Token::MINUS)),
+                '+' => self.consume("+", Some(Token::PLUS)),
+                '*' => self.consume("+", Some(Token::MULT)),
+                '/' => self.consume("+", Some(Token::DIV)),
                 ';' => self.consume_comment(),
                 '\n' => self.consume_endlines(),
                 '\r' => self.consume_endlines(),

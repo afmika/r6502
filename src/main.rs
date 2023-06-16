@@ -1,4 +1,9 @@
-use r6502::asm_lexer::{AsmLexer, Token};
+use r6502::{
+    asm_lexer::{
+        AsmLexer, 
+        Token
+    }
+};
 
 fn main() {
     let mut lexer = AsmLexer::new(&String::from(r"
@@ -14,6 +19,11 @@ fn main() {
             INX2
             CPX %123 ; another
             BEQ LOOP
+
+        : LDA #12
+        +
+        -
+        =
         .endproc
         "
         )
