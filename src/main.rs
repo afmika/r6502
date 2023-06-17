@@ -47,7 +47,22 @@ fn sample_test() {
 
 fn parser_test() {
     let mut lexer = AsmLexer::new(&String::from(r"
-        LDX ($0FF) 
+        LDA ($0FF) 
+        LDA
+        LDX ($0FF)
+        LDX ($FF), y
+        LDX ($FF, x)
+        LDA
+        LDX #$FF
+        LDA
+        LDA $00FF, y
+        LDA $00FF, x
+        LDA $00FF
+
+        LDA $FF, y
+        LDA $FF, x
+        LDA $FF
+
 "
         )
     );

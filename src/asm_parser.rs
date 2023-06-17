@@ -3,7 +3,7 @@ use std::cmp::min;
 use crate::asm_lexer::Token;
 use crate::opcodes::{
     Instr,
-    AdrMode
+    AdrMode, INSTR
 };
 
 /**
@@ -26,8 +26,8 @@ use crate::opcodes::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
     DIRECTIVE(Directive),
-    ASSIGN(Token, Operand), // lit, value
-    LABEL(Token),
+    ASSIGN(String, Operand), // lit, value
+    LABEL(String),
     INSTR(Instr, AdrMode, Operand)
 }
 
@@ -39,17 +39,17 @@ pub enum Operand {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MathExpr {
-    PLUS, MINUS, MULT, DIV,
+    BIN(Token, Box<MathExpr>, Box<MathExpr>),
     PLACEHOLDER(String), NUM(NumericValue)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Directive {
-    EXPORT, INCLUDE(Token),
-    ENDPROC, PROC(Token),                 // .proc main 
-    SEGMENT(Token),                       // .segment "NAME"
-    BYTE(Vec<Token>),                     // .byte 1, 2, 3, ... (8 bits dec, bin or hex) or even strings
-    ENDMACRO, MACRO(Token, Vec<Token>)    // .macro NAME arg1 arg2 ... argN (.*)\n endmacro
+    EXPORT, INCLUDE(String),
+    ENDPROC, PROC(String),                 // .proc main 
+    SEGMENT(String),                       // .segment "NAME"
+    BYTE(Vec<String>),                     // .byte 1, 2, 3, ... (8 bits dec, bin or hex) or even strings
+    ENDMACRO, MACRO(String, Vec<String>)    // .macro NAME arg1 arg2 ... argN (.*)\n endmacro
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,7 +58,7 @@ pub struct NumericValue {
     size: u32
 }
 
-pub fn canonicalize_number(n: &Token) -> Result<NumericValue, String> {
+fn canonicalize_number(n: &Token) -> Result<NumericValue, String> {
     match n {
         Token::BIN(bin) => {
             let value: u32 = u32::from_str_radix(bin, 2).unwrap();
@@ -89,6 +89,14 @@ pub fn canonicalize_number(n: &Token) -> Result<NumericValue, String> {
 }
 
 
+fn get_instr(s: &String) -> Result<Instr, String> {
+    match INSTR.get(s) {
+        Some(i) => Ok(i.to_owned()),
+        None => Err(format!("{:?} is not a valid instruction", s))
+    }
+}
+
+
 pub struct AsmParser<'a> {
     tokens: &'a Vec<Token>,
     cursor: usize,
@@ -109,6 +117,10 @@ impl<'a> AsmParser<'a> {
             // cleanup
             if self.is_eof() {
                 break;
+            }
+            if *self.curr() == Token::NEWLINE {
+                self.next();
+                continue;
             }
             let token = self.curr();
             let res = self.state_instr()?;
@@ -160,17 +172,104 @@ impl<'a> AsmParser<'a> {
         Err(format!("{:?} was expected, got {:?} instead", token, *self.curr()))
     }
 
+    fn consume_literal(&mut self, s: &str) -> Result<Token, String> {
+        let curr = self.curr().clone();
+        match &curr {
+            Token::LITERAL(lit) => {
+                if lit.ne(s) {
+                    return Err(format!("literal {:?} was expected, got {:?} instead", s, curr))
+                }
+                let curr = self.curr().clone();
+                self.next();
+                Ok(curr)
+            },
+            token => Err(format!("literal {:?} was expected, got {:?} instead", s, token))
+        }
+    }
+
+    // expr      ::= term (+| -) expr | term
+    fn consume_math_expr(&mut self) -> Result<MathExpr, String> {
+        let expr = self.consume_math_term()?;
+        let bin = vec![Token::PLUS, Token::MINUS];
+        for op in bin {
+            if *self.curr() == op {
+                let op_token = self.consume(op)?;
+                let right = self.consume_math_expr()?;
+                return Ok(MathExpr::BIN(op_token, Box::new(expr), Box::new(right)));
+            }
+        }
+        Ok(expr)
+    }
+
+    // term      ::= factor (* | /) term | factor
+    fn consume_math_term(&mut self) -> Result<MathExpr, String> {
+        let expr = self.consume_math_factor()?;
+        let bin = vec![Token::MULT, Token::DIV];
+        for op in bin {
+            if *self.curr() == op {
+                let op_token = self.consume(op)?;
+                let right = self.consume_math_term()?;
+                return Ok(MathExpr::BIN(op_token, Box::new(expr), Box::new(right)));
+            }
+        }
+        Ok(expr)
+    }
+
+    // factor    ::= (expr) | unary
+    fn consume_math_factor(&mut self) -> Result<MathExpr, String> {
+        if *self.curr() == Token::PARENTOPEN {
+            self.consume(Token::PARENTOPEN)?;
+            let expr = self.consume_math_expr()?;
+            self.consume(Token::PARENTCLOSE)?;
+            return Ok(expr);
+        }
+        self.consume_math_unary()
+    }
+
+    // unary     ::= <literal> | hex | dec | bin
+    fn consume_math_unary(&mut self) -> Result<MathExpr, String> {
+        match canonicalize_number(&self.curr()) {
+            Ok(number) => {
+                self.next();
+                Ok(MathExpr::NUM(number))
+            },
+            Err(e) => {
+                match &self.curr() {
+                    Token::LITERAL(s) => Ok(MathExpr::PLACEHOLDER(s.to_string())),
+                    _ => Err(e)
+                }
+            }
+        }
+    }
+
     fn state_instr(&mut self) -> Result<Expr, String> {
-        let instr = self.curr();
+        let instr = match self.curr().clone() {
+            Token::LITERAL(i) => Ok(get_instr(&i)?),
+            token => Err(format!("{:?} is not a literal", token))
+        }?;
         self.next();
         // [none ::= implied, accumulator]
         // operand ::= none | imm | abs | ind | rel | zp
         // imm     ::= #$BB
-        // abs     ::= $LLHH | $LLHH ',' ('x'|'y')
         // ind     ::= '(' $LLHH ')' | '(' $BB ',' 'x' ')' | '(' $BB  ')' ',' 'y'
         // rel     ::= $BB                                  (context bound: only for jumps BXX)
         // zp      ::= $BB | $BB ',' ('x'|'y')
+        // abs     ::= $LLHH | $LLHH ',' ('x'|'y')
 
+        // none
+        if *self.curr() == Token::NEWLINE || *self.curr() == Token::EOF {
+            return Ok(Expr::INSTR(instr, AdrMode::IMPL, Operand::NONE));
+        }
+
+        // immidiate
+        if *self.curr() == Token::HASH {
+            self.consume(Token::HASH)?;
+            let number = canonicalize_number(self.curr())?;
+            let op = Operand::EXPR(MathExpr::NUM(number));
+            return Ok(Expr::INSTR(instr, AdrMode::IMM, op));
+        }
+
+        // ind, indx, indy
         if *self.curr() == Token::PARENTOPEN {
             // indirect
             self.consume(Token::PARENTOPEN)?;
@@ -181,13 +280,61 @@ impl<'a> AsmParser<'a> {
                 let op = Operand::EXPR(MathExpr::NUM(number));
                 self.next();
                 self.consume(Token::PARENTCLOSE)?;
-                return Ok(Expr::INSTR(Instr::NOP, AdrMode::IND, op));
+                return Ok(Expr::INSTR(instr, AdrMode::IND, op));
             } else {
-                // indirect x
-                panic!("8 bits non implemented")
+                let op = Operand::EXPR(MathExpr::NUM(number));
+                self.next();
+                if *self.curr() == Token::COMMA {
+                    // indirect x
+                    self.consume(Token::COMMA)?;
+                    self.consume_literal("x")?;
+                    self.consume(Token::PARENTCLOSE)?;
+                    return Ok(Expr::INSTR(instr, AdrMode::INDX, op));
+                } else {
+                    // indirect y
+                    self.consume(Token::PARENTCLOSE)?;
+                    self.consume(Token::COMMA)?;
+                    self.consume_literal("y")?;
+                    return Ok(Expr::INSTR(instr, AdrMode::INDY, op));
+                }
             }
         }
-        panic!("non implemented")
+
+        // abs and zp
+        let number = canonicalize_number(self.curr())?;
+        if number.size > 8 {
+            // abs
+            let op = Operand::EXPR(MathExpr::NUM(number));
+            let mut mode = AdrMode::ABS;
+            self.next();
+            if *self.curr() == Token::COMMA {
+                self.consume(Token::COMMA)?;
+                match self.consume_literal("x") {
+                    Ok(_) =>  { mode = AdrMode::ABSX },
+                    Err(_) => { 
+                        self.consume_literal("y")?;
+                        mode = AdrMode::ABSY;
+                    }
+                };
+            }
+            return Ok(Expr::INSTR(instr, mode, op));
+        } else {
+            // zp
+            let op = Operand::EXPR(MathExpr::NUM(number));
+            let mut mode = AdrMode::ZP;
+            self.next();
+            if *self.curr() == Token::COMMA {
+                self.consume(Token::COMMA)?;
+                match self.consume_literal("x") {
+                    Ok(_) =>  { mode = AdrMode::ZPX },
+                    Err(_) => { 
+                        self.consume_literal("y")?;
+                        mode = AdrMode::ZPY;
+                    }
+                };
+            }
+            return Ok(Expr::INSTR(instr, mode, op));
+        }
     }
 
     fn state_operand(&self) -> Result<Operand, String> {

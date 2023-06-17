@@ -7,7 +7,8 @@ pub enum AdrMode {
     ABSX, ABSY,
     ZP, ZPX, ZPY,
     IND, INDX, INDY,
-    REL
+    REL, 
+    UNKNOWN // fallback for math expr
 }
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
@@ -39,8 +40,9 @@ pub enum Instr {
 // Absolute Y: AND $4400,Y consumes $44 and $00, Y is for notation
 // Indirect X: AND ($44,X) consumes $44 only, X is for notation
 // Zero Page, Immediate : AND $44 consumes $44 only
-pub fn canonical_op_len(adr_mode: &AdrMode) -> u8 {
+pub fn canonical_op_len(adr_mode: &AdrMode) -> i8 {
     match adr_mode {
+        AdrMode::UNKNOWN => -1,
         AdrMode::IMPL => 0,
         AdrMode::IMM | AdrMode::ZP | AdrMode::ZPX | AdrMode::ZPY 
         | AdrMode::INDX | AdrMode::INDY | AdrMode::REL => 1,
@@ -66,7 +68,84 @@ impl Opcode {
 
 // https://github.com/afmika/opcodes-json-6502
 lazy_static! {
-    #[rustfmt::skip]
+    pub static ref INSTR: HashMap<String, Instr> = HashMap::from([
+        ("LDA".to_string(), Instr::LDA),
+        ("LDX".to_string(), Instr::LDX),
+        ("LDY".to_string(), Instr::LDY),
+        ("STA".to_string(), Instr::STA),
+        ("STX".to_string(), Instr::STX),
+        ("STY".to_string(), Instr::STY),
+        ("TAX".to_string(), Instr::TAX),
+        ("TAY".to_string(), Instr::TAY),
+        ("TSX".to_string(), Instr::TSX),
+        ("TXA".to_string(), Instr::TXA),
+        ("TXS".to_string(), Instr::TXS),
+        ("TYA".to_string(), Instr::TYA),
+        ("PHA".to_string(), Instr::PHA),
+        ("PHP".to_string(), Instr::PHP),
+        ("PLA".to_string(), Instr::PLA),
+        ("PLP".to_string(), Instr::PLP),
+        ("DEC".to_string(), Instr::DEC),
+        ("DEX".to_string(), Instr::DEX),
+        ("DEY".to_string(), Instr::DEY),
+        ("INC".to_string(), Instr::INC),
+        ("INX".to_string(), Instr::INX),
+        ("INY".to_string(), Instr::INY),
+        ("ADC".to_string(), Instr::ADC),
+        ("SBC".to_string(), Instr::SBC),
+        ("AND".to_string(), Instr::AND),
+        ("EOR".to_string(), Instr::EOR),
+        ("ORA".to_string(), Instr::ORA),
+        ("ASL".to_string(), Instr::ASL),
+        ("LSR".to_string(), Instr::LSR),
+        ("ROL".to_string(), Instr::ROL),
+        ("ROR".to_string(), Instr::ROR),
+        ("CLC".to_string(), Instr::CLC),
+        ("CLD".to_string(), Instr::CLD),
+        ("CLI".to_string(), Instr::CLI),
+        ("CLV".to_string(), Instr::CLV),
+        ("SEC".to_string(), Instr::SEC),
+        ("SED".to_string(), Instr::SED),
+        ("SEI".to_string(), Instr::SEI),
+        ("CMP".to_string(), Instr::CMP),
+        ("CPX".to_string(), Instr::CPX),
+        ("CPY".to_string(), Instr::CPY),
+        ("BCC".to_string(), Instr::BCC),
+        ("BCS".to_string(), Instr::BCS),
+        ("BEQ".to_string(), Instr::BEQ),
+        ("BMI".to_string(), Instr::BMI),
+        ("BNE".to_string(), Instr::BNE),
+        ("BPL".to_string(), Instr::BPL),
+        ("BVC".to_string(), Instr::BVC),
+        ("BVS".to_string(), Instr::BVS),
+        ("JMP".to_string(), Instr::JMP),
+        ("JSR".to_string(), Instr::JSR),
+        ("RTS".to_string(), Instr::RTS),
+        ("BRK".to_string(), Instr::BRK),
+        ("RTI".to_string(), Instr::RTI),
+        ("BIT".to_string(), Instr::BIT),
+        ("NOP".to_string(), Instr::NOP),
+        ("STP".to_string(), Instr::STP),
+        ("SLO".to_string(), Instr::SLO),
+        ("ANC".to_string(), Instr::ANC),
+        ("RLA".to_string(), Instr::RLA),
+        ("SRE".to_string(), Instr::SRE),
+        ("ALR".to_string(), Instr::ALR),
+        ("RRA".to_string(), Instr::RRA),
+        ("ARR".to_string(), Instr::ARR),
+        ("SAX".to_string(), Instr::SAX),
+        ("XAA".to_string(), Instr::XAA),
+        ("AHX".to_string(), Instr::AHX),
+        ("TAS".to_string(), Instr::TAS),
+        ("SHY".to_string(), Instr::SHY),
+        ("SHX".to_string(), Instr::SHX),
+        ("LAX".to_string(), Instr::LAX),
+        ("LAS".to_string(), Instr::LAS),
+        ("DCP".to_string(), Instr::DCP),
+        ("AXS".to_string(), Instr::AXS),
+        ("ISC".to_string(), Instr::ISC)
+    ]);
+
     pub static ref OPCODES: HashMap<(Instr, AdrMode), Vec<Opcode>> = HashMap::from([
         ((Instr::BRK, AdrMode::IMPL), vec![Opcode::new(0x00, vec!["BRK".to_string()])]),
         ((Instr::ORA, AdrMode::INDX), vec![Opcode::new(0x01, vec!["ORA ($44,X)".to_string()])]),
