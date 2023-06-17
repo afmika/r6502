@@ -186,7 +186,7 @@ impl AsmLexer {
             self.next();
         }
         if s.len() == 0 || s.len() > 4 {
-            return Err(format!("8 bits hex was expected, got '${}'", s));
+            return Err(format!("8 bits hex was expected, got '${}'", self.curr()));
         }
         Ok(Token::HEX(s))
     }
@@ -199,7 +199,7 @@ impl AsmLexer {
             self.next();
         }
         if s.len() == 0 || s.len() > 8 {
-            return Err(format!("8 bits binary was expected, got '%{}'", s));
+            return Err(format!("8 bits binary was expected, got '%{}'", self.curr()));
         }
         Ok(Token::BIN(s))
     }

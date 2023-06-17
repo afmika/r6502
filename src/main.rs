@@ -63,6 +63,8 @@ fn parser_test() {
         LDA $FF, x
         LDA $FF
 
+        LDX #(1 + 2 / (3 - 4))
+
 "
         )
     );

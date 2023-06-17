@@ -264,8 +264,8 @@ impl<'a> AsmParser<'a> {
         // immidiate
         if *self.curr() == Token::HASH {
             self.consume(Token::HASH)?;
-            let number = canonicalize_number(self.curr())?;
-            let op = Operand::EXPR(MathExpr::NUM(number));
+            let number = self.consume_math_expr()?;
+            let op = Operand::EXPR(number);
             return Ok(Expr::INSTR(instr, AdrMode::IMM, op));
         }
 
@@ -336,13 +336,4 @@ impl<'a> AsmParser<'a> {
             return Ok(Expr::INSTR(instr, mode, op));
         }
     }
-
-    fn state_operand(&self) -> Result<Operand, String> {
-        Ok(Operand::NONE)
-    }
-
-    fn state_math_expr(&mut self) {
-
-    }
-
 }
