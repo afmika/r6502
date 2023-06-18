@@ -90,7 +90,7 @@ fn canonicalize_number(n: &Token) -> Result<NumericValue, String> {
 
 
 fn get_instr(s: &String) -> Result<Instr, String> {
-    match INSTR.get(s) {
+    match INSTR.get(&s.to_uppercase()) {
         Some(i) => Ok(i.to_owned()),
         None => Err(format!("{:?} is not a valid instruction", s))
     }

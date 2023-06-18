@@ -66,7 +66,7 @@ fn parser_test() {
         LDX #(1 + 2 / (3 - variable))
 
         BNE hello
-        BMI #$BB
+        bmi $BB
 
 "
         )
