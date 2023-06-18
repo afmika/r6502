@@ -96,6 +96,20 @@ fn get_instr(s: &String) -> Result<Instr, String> {
     }
 }
 
+fn is_branching(i: &Instr) -> bool {
+    let list = [
+        Instr::BPL, Instr::BMI, Instr::BVC,
+        Instr::BVS, Instr::BCC, Instr::BCS,
+        Instr::BNE, Instr::BEQ
+    ];
+    for item in list {
+        if item.to_string().eq(&i.to_string()) {
+            return true;
+        }
+    }
+    false
+} 
+
 
 pub struct AsmParser<'a> {
     tokens: &'a Vec<Token>,
@@ -235,8 +249,14 @@ impl<'a> AsmParser<'a> {
             },
             Err(e) => {
                 match &self.curr() {
-                    Token::LITERAL(s) => Ok(MathExpr::PLACEHOLDER(s.to_string())),
-                    _ => Err(e)
+                    Token::LITERAL(s) => {
+                        let out = MathExpr::PLACEHOLDER(s.to_string());
+                        self.next();
+                        Ok(out)
+                    },
+                    _ => {
+                        Err(e)
+                    }
                 }
             }
         }
@@ -259,6 +279,25 @@ impl<'a> AsmParser<'a> {
         // none
         if *self.curr() == Token::NEWLINE || *self.curr() == Token::EOF {
             return Ok(Expr::INSTR(instr, AdrMode::IMPL, Operand::NONE));
+        }
+
+        // branching BXX
+        if is_branching(&instr) {
+            match canonicalize_number(self.curr()) {
+                Ok(number) => {
+                    let op = Operand::EXPR(MathExpr::NUM(number));
+                    return Ok(Expr::INSTR(instr, AdrMode::REL, op));
+                },
+                Err(e) => {
+                    match self.curr() {
+                        Token::LITERAL(s) => {
+                            let op = Operand::EXPR(MathExpr::PLACEHOLDER(s.clone()));
+                            return Ok(Expr::INSTR(instr, AdrMode::REL, op));
+                        },
+                        _ => { return Err(e) }
+                    }
+                }
+            }
         }
 
         // immidiate

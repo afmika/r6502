@@ -1,5 +1,5 @@
 use lazy_static::lazy_static;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub enum AdrMode {
@@ -35,6 +35,12 @@ pub enum Instr {
     STP, SLO, ANC, RLA, SRE, ALR, RRA, ARR, SAX,
     XAA, AHX, TAS, SHY, SHX, LAX, LAS, DCP, AXS,
     ISC
+}
+
+impl Display for Instr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 // Absolute Y: AND $4400,Y consumes $44 and $00, Y is for notation

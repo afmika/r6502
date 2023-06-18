@@ -63,7 +63,10 @@ fn parser_test() {
         LDA $FF, x
         LDA $FF
 
-        LDX #(1 + 2 / (3 - 4))
+        LDX #(1 + 2 / (3 - variable))
+
+        BNE hello
+        BMI #$BB
 
 "
         )
