@@ -66,7 +66,11 @@ fn parser_test() {
         LDX #(1 + 2 / (3 - variable))
 
         BNE hello
+
+        one = two + 6
+
         bmi $BB
+
 
 "
         )
@@ -74,7 +78,10 @@ fn parser_test() {
     let res = lexer.tokenize();
     let tokens = res.unwrap();
     let mut parser = AsmParser::new(&tokens);
-    parser.parse().unwrap();
+    let prog = parser.parse().unwrap();
+    for i in prog {
+        println!("{:?}", i);
+    }
 }
 
 fn main() {

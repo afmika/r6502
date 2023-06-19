@@ -1,4 +1,5 @@
 use std::cmp::min;
+use std::collections::HashMap;
 
 use crate::asm_lexer::Token;
 use crate::opcodes::{
@@ -114,6 +115,7 @@ fn is_branching(i: &Instr) -> bool {
 pub struct AsmParser<'a> {
     tokens: &'a Vec<Token>,
     cursor: usize,
+    variables: HashMap<String, Operand> 
 }
 
 impl<'a> AsmParser<'a> {
@@ -121,6 +123,7 @@ impl<'a> AsmParser<'a> {
         Self {
             tokens,
             cursor: 0,
+            variables: HashMap::new()
         }
     }
 
@@ -136,9 +139,20 @@ impl<'a> AsmParser<'a> {
                 self.next();
                 continue;
             }
-            let token = self.curr();
-            let res = self.state_instr()?;
-            println!("{:?}", res);
+
+            if *self.peek_next() == Token::EQUAL {
+                match self.curr() {
+                    Token::LITERAL(_) => {
+                        prog.push(self.state_assign()?);
+                        continue;
+                    },
+                    _ => {
+                        return Err("assign expression expects a litearl (lhs) / expression(rhs)".to_string())    
+                    }
+                }
+            }
+
+            prog.push(self.state_instr()?);
             self.next();
         }
         Ok(prog)
@@ -184,6 +198,18 @@ impl<'a> AsmParser<'a> {
             return Ok(token);
         }
         Err(format!("{:?} was expected, got {:?} instead", token, *self.curr()))
+    }
+
+    fn consume_literal_and_lift(&mut self) -> Result<String, String> {
+        let curr = self.curr().clone();
+        match curr {
+            Token::LITERAL(lit) => {
+                let curr = self.curr().clone();
+                self.next();
+                Ok(lit)
+            },
+            token => Err(format!("literal was expected, got {:?} instead",token))
+        }
     }
 
     fn consume_literal(&mut self, s: &str) -> Result<Token, String> {
@@ -374,5 +400,20 @@ impl<'a> AsmParser<'a> {
             }
             return Ok(Expr::INSTR(instr, mode, op));
         }
+    }
+
+    fn state_assign(&mut self) -> Result<Expr, String> {
+        let symbol = self.consume_literal_and_lift()?;
+        self.consume(Token::EQUAL)?;
+        let number = self.consume_math_expr()?;
+        let op = Operand::EXPR(number);
+        self.variables.insert(symbol.clone(), op.clone());
+        Ok(Expr::ASSIGN(symbol, op))
+    }
+
+    // TODO
+    pub fn eval_math(self, expr: MathExpr) -> Result<NumericValue, String> {
+        // use lookup variables and recursively evaluate
+        Err("not implemented".to_string())
     }
 }
