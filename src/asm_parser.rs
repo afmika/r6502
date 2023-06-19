@@ -1,4 +1,4 @@
-use std::cmp::min;
+use std::cmp::{min, max};
 use std::collections::HashMap;
 
 use crate::asm_lexer::Token;
@@ -27,7 +27,7 @@ use crate::opcodes::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
     DIRECTIVE(Directive),
-    ASSIGN(String, Operand), // lit, value
+    ASSIGN(String, MathExpr), // lit, value
     LABEL(String),
     INSTR(Instr, AdrMode, Operand)
 }
@@ -35,7 +35,8 @@ pub enum Expr {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Operand {
     NONE,               // implied
-    EXPR(MathExpr)      // label, variable, 1 or 2 bytes hex/dec/bin
+    LABEL(String),
+    VALUE(NumericValue)  // label, variable, 1 or 2 bytes hex/dec/bin
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -115,7 +116,7 @@ fn is_branching(i: &Instr) -> bool {
 pub struct AsmParser<'a> {
     tokens: &'a Vec<Token>,
     cursor: usize,
-    variables: HashMap<String, Operand> 
+    variables: HashMap<String, MathExpr> 
 }
 
 impl<'a> AsmParser<'a> {
@@ -288,6 +289,84 @@ impl<'a> AsmParser<'a> {
         }
     }
 
+    // expr should guarantee to be not recursive
+    pub fn eval_math(&self, expr: &MathExpr) -> Result<NumericValue, String> {
+        match expr {
+            MathExpr::BIN(op, L, R) => {
+                let left = self.eval_math(L)?;
+                let right = self.eval_math(R)?;
+                let value = match op {
+                    Token::PLUS => {
+                        if left.value.checked_add(right.value).is_none() {
+                            return Err(format!("add overflow: left {}, right {}", left.value, right.value));
+                        }
+                        Ok(left.value + right.value)
+                    },
+                    Token::MULT => {
+                        if left.value.checked_mul(right.value).is_none() {
+                            return Err(format!("multiplication overflow: left {}, right {}", left.value, right.value));
+                        }
+                        Ok(left.value * right.value)
+                    },
+                    Token::MINUS => {
+                        if left.value.checked_sub(right.value).is_none() {
+                            return Err(format!("substraction overflow: left {}, right {}", left.value, right.value));
+                        }
+                        Ok(left.value - right.value)
+                    },
+                    Token::DIV => {
+                        if left.value.checked_div(right.value).is_none() {
+                            return Err(format!("cannot divide {} by zero", left.value));
+                        }
+                        Ok(left.value / right.value)
+                    }
+                    token => Err(format!("binary operator {:?} not implemented", token))
+                }?;
+                Ok(NumericValue { value, size: max(left.size, right.size)})
+            },
+            MathExpr::NUM(n) => Ok(n.clone()),
+            MathExpr::PLACEHOLDER(s) => {
+                let nested = self.variables.get(s);
+                if nested.is_some() {
+                    return self.eval_math(nested.unwrap());
+                }
+                Err(format!("variable {:?} is undefined", s))
+            },
+        }
+    }
+
+    pub fn validate_factors(&self, expr: &MathExpr, assignee: &Option<String>) -> Result<bool, String> {
+        match expr {
+            MathExpr::NUM(_) => Ok(true),
+            MathExpr::BIN(_, L, R) => {
+                let left = self.validate_factors(L, assignee)?;
+                let right = self.validate_factors(R, assignee)?;
+                Ok(left && right)
+            },
+            MathExpr::PLACEHOLDER(s) => {
+                if assignee.is_some() && s.to_owned() == assignee.clone().unwrap() {
+                    return Err(format!("variable {:?} has recursive definition", s))
+                }
+                let nested = self.variables.get(s);
+                if nested.is_some() {
+                    return self.validate_factors(nested.unwrap(), assignee);
+                }
+                Err(format!("variable {:?} is undefined", s))
+            },
+        }
+    }
+
+    fn state_assign(&mut self) -> Result<Expr, String> {
+        let symbol = self.consume_literal_and_lift()?;
+        self.consume(Token::EQUAL)?;
+        let number = self.consume_math_expr()?;
+        if !self.validate_factors(&number, &Some(symbol.clone()))? {
+            return Err(format!("{} rhs is not valid", symbol));
+        }
+        self.variables.insert(symbol.clone(), number.clone());
+        Ok(Expr::ASSIGN(symbol, number))
+    }
+
     fn state_instr(&mut self) -> Result<Expr, String> {
         let instr = match self.curr().clone() {
             Token::LITERAL(i) => Ok(get_instr(&i)?),
@@ -311,13 +390,13 @@ impl<'a> AsmParser<'a> {
         if is_branching(&instr) {
             match canonicalize_number(self.curr()) {
                 Ok(number) => {
-                    let op = Operand::EXPR(MathExpr::NUM(number));
+                    let op = Operand::VALUE(number);
                     return Ok(Expr::INSTR(instr, AdrMode::REL, op));
                 },
                 Err(e) => {
                     match self.curr() {
                         Token::LITERAL(s) => {
-                            let op = Operand::EXPR(MathExpr::PLACEHOLDER(s.clone()));
+                            let op = Operand::LABEL(s.clone());
                             return Ok(Expr::INSTR(instr, AdrMode::REL, op));
                         },
                         _ => { return Err(e) }
@@ -329,8 +408,9 @@ impl<'a> AsmParser<'a> {
         // immidiate
         if *self.curr() == Token::HASH {
             self.consume(Token::HASH)?;
-            let number = self.consume_math_expr()?;
-            let op = Operand::EXPR(number);
+            let expr = &self.consume_math_expr()?;
+            let number = self.eval_math(expr)?;
+            let op = Operand::VALUE(number);
             return Ok(Expr::INSTR(instr, AdrMode::IMM, op));
         }
 
@@ -342,12 +422,12 @@ impl<'a> AsmParser<'a> {
             let number = canonicalize_number(self.curr())?;
             if number.size > 8 {
                 // indirect
-                let op = Operand::EXPR(MathExpr::NUM(number));
+                let op = Operand::VALUE(number);
                 self.next();
                 self.consume(Token::PARENTCLOSE)?;
                 return Ok(Expr::INSTR(instr, AdrMode::IND, op));
             } else {
-                let op = Operand::EXPR(MathExpr::NUM(number));
+                let op = Operand::VALUE(number);
                 self.next();
                 if *self.curr() == Token::COMMA {
                     // indirect x
@@ -369,7 +449,7 @@ impl<'a> AsmParser<'a> {
         let number = canonicalize_number(self.curr())?;
         if number.size > 8 {
             // abs
-            let op = Operand::EXPR(MathExpr::NUM(number));
+            let op = Operand::VALUE(number);
             let mut mode = AdrMode::ABS;
             self.next();
             if *self.curr() == Token::COMMA {
@@ -385,7 +465,7 @@ impl<'a> AsmParser<'a> {
             return Ok(Expr::INSTR(instr, mode, op));
         } else {
             // zp
-            let op = Operand::EXPR(MathExpr::NUM(number));
+            let op = Operand::VALUE(number);
             let mut mode = AdrMode::ZP;
             self.next();
             if *self.curr() == Token::COMMA {
@@ -400,20 +480,5 @@ impl<'a> AsmParser<'a> {
             }
             return Ok(Expr::INSTR(instr, mode, op));
         }
-    }
-
-    fn state_assign(&mut self) -> Result<Expr, String> {
-        let symbol = self.consume_literal_and_lift()?;
-        self.consume(Token::EQUAL)?;
-        let number = self.consume_math_expr()?;
-        let op = Operand::EXPR(number);
-        self.variables.insert(symbol.clone(), op.clone());
-        Ok(Expr::ASSIGN(symbol, op))
-    }
-
-    // TODO
-    pub fn eval_math(self, expr: MathExpr) -> Result<NumericValue, String> {
-        // use lookup variables and recursively evaluate
-        Err("not implemented".to_string())
     }
 }
