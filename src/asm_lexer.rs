@@ -16,10 +16,12 @@ pub enum Token {
     MINUS,              // +
     MULT,               // *
     DIV,                // /
-    EQUAL,                // =
+    EQUAL,              // =
     DEC(String),        // [0-9]+
     HEX(String),        // \$[0-9abdef]+
     BIN(String),        // %[01]+
+    STR(String),        // "(.*)"
+    CHAR(String),        // '.{1}'
     EOF
 }
 
@@ -89,6 +91,8 @@ impl AsmLexer {
                 '\r' => self.consume_endlines(),
                 '$' => self.consume_hex(),
                 '%' => self.consume_bin(),
+                '"' => self.consume_string(),
+                '\'' => self.consume_char(),
                 '0' ..= '9' => self.consume_dec(),
                 _ => {
                     return Err(format!("{:?} is not a supported character", c));
@@ -253,6 +257,32 @@ impl AsmLexer {
         } else {
             Ok(Token::LITERAL(tk))
         }
+    }
+
+    fn consume_string(&mut self) -> Result<Token, String> {
+        self.consume("\"", None)?;
+        let mut s = String::from("");
+        while *self.curr() != '"' && !self.is_endline() && !self.is_eof()  {
+            if *self.curr() == '\\' {
+                self.next();
+            }
+            s.push(*self.curr());
+            self.next();
+        }
+        self.consume("\"", None)?;
+        Ok(Token::STR(s))
+    }
+
+    fn consume_char(&mut self) -> Result<Token, String> {
+        self.consume("\'", None)?;
+        if *self.curr() == '\\' {
+            // escape
+            self.next();
+        }
+        let value = String::from(*self.curr());
+        self.next();
+        self.consume("\'", None)?;
+        Ok(Token::CHAR(value))
     }
 
     fn consume_comment(&mut self) -> Result<Token, String> {
