@@ -300,7 +300,7 @@ impl<'a> AsmParser<'a> {
                     if value.size > size {
                         let pos = seq.len();
                         return Err(format!(
-                            "{}-nth value has {} bytes, {} was expected", 
+                            "{}-th value is {} bytes, {} was expected", 
                             pos, 
                             max(1, value.size / 8), 
                             size / 8
