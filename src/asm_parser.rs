@@ -7,22 +7,6 @@ use crate::opcodes::{
     AdrMode, INSTR
 };
 
-/**
- * * decimal
- * @TODOS
- * 0. start at an offset
- * ORG $0080
- * AND other compiler directive
- * 
- * 1. store variables, and strings
- * SRC     .WORD $0400     ;source string pointer
- * MY_STR  .
- * 
- * 2. in place operations and support of chars
- * CMP #'A'
- * CMP #'Z'+1
- */
-
 // https://famicom.party/book/05-6502assembly/
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
@@ -47,11 +31,13 @@ pub enum MathExpr {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Directive {
-    EXPORT, INCLUDE(String),
-    ENDPROC, PROC(String),                 // .proc main 
-    SEGMENT(String),                       // .segment "NAME"
-    BYTE(Vec<String>),                     // .byte 1, 2, 3, ... (8 bits dec, bin or hex) or even strings
-    ENDMACRO, MACRO(String, Vec<String>)    // .macro NAME arg1 arg2 ... argN (.*)\n endmacro
+    // TODO
+    // EXPORT, INCLUDE(String),
+    // ENDPROC, PROC(String),                 // .proc main 
+    // SEGMENT(String),                       // .segment "NAME"
+    // ENDMACRO, MACRO(String, Vec<String>)   // .macro NAME arg1 arg2 ... argN (.*)\n endmacro
+    BYTE(Vec<NumericValue>),                  // (.db, .byte) 1, 2, 3, ... 8 bit, can be strings
+    DWORD(Vec<NumericValue>),                 // .dw 1, 2, 3, ... (16 bits)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,8 +70,12 @@ fn canonicalize_number(n: &Token) -> Result<NumericValue, String> {
             }
             Ok(NumericValue { value, size: 8 })
         },
+        Token::CHAR(ch) => {
+            let value: u32 = ch.chars().next().unwrap() as u32;
+            Ok(NumericValue { value, size: 8 })
+        },
         token => {
-            Err(format!("token {:?} is not a number", token))
+            Err(format!("operand next {:?} is not a number", token))
         }
     }
 }
@@ -132,15 +122,17 @@ impl<'a> AsmParser<'a> {
         let mut prog = Vec::new();
         self.cursor = 0;
         loop {
+            println!("{:?}", self.curr().clone());
             // cleanup
             if self.is_eof() {
                 break;
             }
-            if *self.curr() == Token::NEWLINE {
+            if self.is_endline() {
                 self.next();
                 continue;
             }
 
+            // assign
             if *self.peek_next() == Token::EQUAL {
                 match self.curr() {
                     Token::LITERAL(_) => {
@@ -148,11 +140,46 @@ impl<'a> AsmParser<'a> {
                         continue;
                     },
                     _ => {
-                        return Err("assign expression expects a litearl (lhs) / expression(rhs)".to_string())    
+                        return Err("assign expression expects a literal (lhs) / expression(rhs)".to_string())    
                     }
                 }
             }
 
+            // label declaration
+            if *self.peek_next() == Token::COLON {
+                match self.curr() {
+                    Token::LITERAL(_) => {
+                        prog.push(self.state_label()?);
+                        continue;
+                    },
+                    _ => {
+                        return Err("label expression expects a literal (lhs) / expression(rhs)".to_string())    
+                    }
+                }
+            }
+
+            match self.curr().clone() {
+                Token::DIRECTIVE(name) => {
+                    match name.as_str() {
+                        "byte" | "BYTE" | "db" | "DB" => {
+                            self.next();
+                            let seq = self.consume_sequence(8)?;
+                            prog.push(Expr::DIRECTIVE(Directive::BYTE(seq)));
+                        },
+                        "dword" | "DWORD" | "dw" | "DW" => {
+                            self.next();
+                            let seq = self.consume_sequence(16)?;
+                            prog.push(Expr::DIRECTIVE(Directive::DWORD(seq)));
+                        }
+                        _ => {
+                            return Err(self.curr_unexpected());
+                        }
+                    }
+                    continue;
+                },
+                _ => {}
+            }
+            // instruction
             prog.push(self.state_instr()?);
             self.next();
         }
@@ -177,6 +204,10 @@ impl<'a> AsmParser<'a> {
         *self.curr() == Token::EOF 
     }
 
+    fn is_endline(&self) -> bool {
+        *self.curr() == Token::NEWLINE
+    }
+
     fn next(&mut self) -> &Token {
         self.cursor = min(self.tokens.len(), self.cursor + 1);
         return self.curr();
@@ -193,6 +224,10 @@ impl<'a> AsmParser<'a> {
         return self.curr();
     }
 
+    fn curr_unexpected(&self) -> String {
+        format!("token {:?} unexpected", self.curr())
+    }
+
     fn consume(&mut self, token: Token) -> Result<Token, String> {
         if *self.curr() == token {
             self.next();
@@ -205,7 +240,6 @@ impl<'a> AsmParser<'a> {
         let curr = self.curr().clone();
         match curr {
             Token::LITERAL(lit) => {
-                let curr = self.curr().clone();
                 self.next();
                 Ok(lit)
             },
@@ -226,6 +260,42 @@ impl<'a> AsmParser<'a> {
             },
             token => Err(format!("literal {:?} was expected, got {:?} instead", s, token))
         }
+    }
+
+    fn consume_sequence(&mut self, size: u32) -> Result<Vec<NumericValue>, String>  {
+        let mut seq: Vec<NumericValue> = vec![];
+        while !self.is_eof() && !self.is_endline()  {
+            match self.curr() {
+                Token::STR(s) => {
+                    for ch in s.chars() {
+                        let value = ch as u32;
+                        seq.push(NumericValue { value, size: 8 });
+                    }
+                    self.next();
+                },
+                _ => {
+                    // Note: char is also a valid math operand
+                    let expr = self.consume_math_expr()?;
+                    let value = self.eval_math(&expr)?;
+                    if value.size > size {
+                        let pos = seq.len();
+                        return Err(format!(
+                            "{}-nth value has {} bytes, {} was expected", 
+                            pos, 
+                            max(1, value.size / 8), 
+                            size / 8
+                        ));
+                    }
+                    seq.push(value);
+                }
+            }
+
+            if *self.curr() == Token::COMMA {
+                self.consume(Token::COMMA)?;
+            }
+        }
+
+        Ok(seq)
     }
 
     // expr      ::= term (+| -) expr | term
@@ -367,19 +437,26 @@ impl<'a> AsmParser<'a> {
         Ok(Expr::ASSIGN(symbol, number))
     }
 
+    fn state_label(&mut self) -> Result<Expr, String> {
+        let name = self.consume_literal_and_lift()?;
+        self.consume(Token::COLON)?;
+        Ok(Expr::LABEL(name))
+    }
+
+    /// Follow the grammar \
+    /// [none ::= implied, accumulator] \
+    /// operand ::= none | imm | abs | ind | rel | zp \
+    /// imm     ::= #$BB\
+    /// ind     ::= '(' $LLHH ')' | '(' $BB ',' 'x' ')' | '(' $BB  ')' ',' 'y' \
+    /// rel     ::= $BB                                  (context bound: only for jumps BXX) \
+    /// zp      ::= $BB | $BB ',' ('x'|'y') \
+    /// abs     ::= $LLHH | $LLHH ',' ('x'|'y') \
     fn state_instr(&mut self) -> Result<Expr, String> {
         let instr = match self.curr().clone() {
             Token::LITERAL(i) => Ok(get_instr(&i)?),
             token => Err(format!("{:?} is not a literal", token))
         }?;
         self.next();
-        // [none ::= implied, accumulator]
-        // operand ::= none | imm | abs | ind | rel | zp
-        // imm     ::= #$BB
-        // ind     ::= '(' $LLHH ')' | '(' $BB ',' 'x' ')' | '(' $BB  ')' ',' 'y'
-        // rel     ::= $BB                                  (context bound: only for jumps BXX)
-        // zp      ::= $BB | $BB ',' ('x'|'y')
-        // abs     ::= $LLHH | $LLHH ',' ('x'|'y')
 
         // none
         if *self.curr() == Token::NEWLINE || *self.curr() == Token::EOF {

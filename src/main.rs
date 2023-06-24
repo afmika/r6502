@@ -46,7 +46,7 @@ fn sample_test() {
 }
 
 fn parser_test() {
-    let mut lexer = AsmLexer::new(&String::from(r"
+    let mut lexer = AsmLexer::new(&String::from(r##"
         LDA ($0FF) 
         LDA
         LDX ($0FF)
@@ -63,6 +63,7 @@ fn parser_test() {
         LDA $FF, x
         LDA $FF
 
+        hello:
         LDX #(1 + 2 / (3 - 1))
 
         BNE hello
@@ -73,8 +74,11 @@ fn parser_test() {
 
         bmi $BB
 
-
-"
+        y = 68
+        .byte "AB", 67, y
+        .db "DE"
+        .dword "AB", $ffff, 'A', 'A'+3
+"##
         )
     );
     let res = lexer.tokenize();
