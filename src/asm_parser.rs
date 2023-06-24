@@ -263,20 +263,40 @@ impl<'a> AsmParser<'a> {
     }
 
     fn consume_sequence(&mut self, size: u32) -> Result<Vec<NumericValue>, String>  {
+        if size != 8 && size != 16 {
+            return Err(format!("size must be 8 or 16, {} was given", size));
+        }
         let mut seq: Vec<NumericValue> = vec![];
         while !self.is_eof() && !self.is_endline()  {
             match self.curr() {
                 Token::STR(s) => {
-                    for ch in s.chars() {
-                        let value = ch as u32;
-                        seq.push(NumericValue { value, size: 8 });
+                    if size == 16 {
+                        // consume per block of 2 chars
+                        if s.len() % 2 != 0 {
+                            return Err(format!("length of {:?} must be a multiple of 2 to form a 2 byte word", s));
+                        }
+                        let list: Vec<char> = s.chars().collect();
+                        let mut pos = 0;
+                        while pos < list.len() {
+                            let hi = list[pos] as u16;
+                            let lo = list[pos + 1] as u16;
+                            let value = ((hi << 8) | lo) as u32;
+                            seq.push(NumericValue {value, size});
+                            pos += 2;
+                        }
+                    } else {
+                        // == 8
+                        for ch in s.chars() {
+                            let value = ch as u32;
+                            seq.push(NumericValue { value, size: 8 });
+                        }
                     }
                     self.next();
                 },
                 _ => {
                     // Note: char is also a valid math operand
                     let expr = self.consume_math_expr()?;
-                    let value = self.eval_math(&expr)?;
+                    let mut value = self.eval_math(&expr)?;
                     if value.size > size {
                         let pos = seq.len();
                         return Err(format!(
@@ -286,6 +306,8 @@ impl<'a> AsmParser<'a> {
                             size / 8
                         ));
                     }
+                    // promote for values if given size is bigger
+                    value.size = max(value.size, size);
                     seq.push(value);
                 }
             }
