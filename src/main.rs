@@ -74,10 +74,10 @@ fn parser_test() {
 
         bmi $BB
 
-        y = 68
+        y = 12645768
         .byte "AB", 67, y
         .db "DE"
-        .dword "AB", $ffff, 'A', 'A'+3
+        .dword "AB", $ffff, 'A', 'A'+3, y
 "##
         )
     );
