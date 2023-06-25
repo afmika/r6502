@@ -6,20 +6,20 @@ use clap::Subcommand;
 
 #[derive(Subcommand, Debug)]
 enum Mode {
-    /// print compiled hex values
+    /// Print compiled hex values
     Hex,
-    /// print parse result of the program
+    /// Print parse result of the program
     Parse
 }
 
 #[derive(Parser, Debug)]
-#[command(version = "0.0.1", about = "MOS6502 compiler", long_about = None)]
+#[command(version = "0.0.1", about = "6502 assembly compiler", long_about = None)]
 struct Args {
-    /// file path
+    /// File path
     file: String,
-    /// output path
+    /// Output path
     output: Option<String>,
-    /// output mode
+    /// Output mode
     #[clap(subcommand)]
     mode: Option<Mode>
 }
