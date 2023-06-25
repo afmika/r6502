@@ -131,7 +131,7 @@ impl<'a> AsmParser<'a> {
             if self.is_eof() {
                 break;
             }
-            if self.is_endline() {
+            if self.is_endline() || self.is_comment() {
                 self.next();
                 continue;
             }
@@ -231,19 +231,15 @@ impl<'a> AsmParser<'a> {
         *self.curr() == Token::NEWLINE
     }
 
+    fn is_comment(&self) -> bool {
+        match *self.curr() {
+            Token::COMMENT(..) => true,
+            _ => false
+        }
+    }
+
     fn next(&mut self) -> &Token {
         self.cursor = min(self.tokens.len(), self.cursor + 1);
-        return self.curr();
-    }
-
-    fn prev(&mut self) -> &Token {
-        return self.back(1);
-    }
-
-    fn back(&mut self, count: usize) -> &Token {
-        if self.cursor > (count - 1) {
-            self.cursor -= count;
-        }
         return self.curr();
     }
 
@@ -301,7 +297,7 @@ impl<'a> AsmParser<'a> {
             return Err(format!("size must be 8 or 16, {} was given", size));
         }
         let mut seq: Vec<NumericValue> = vec![];
-        while !self.is_eof() && !self.is_endline()  {
+        while !self.is_eof() && !self.is_endline() && !self.is_comment() {
             match self.curr() {
                 Token::STR(s) => {
                     if size == 16 {

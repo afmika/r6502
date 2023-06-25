@@ -2,6 +2,7 @@
 mod tests {
     use crate::asm_lexer::{AsmLexer, Token};
     use crate::asm_parser::{AsmParser, Expr, Directive, Operand, MathExpr, NumericValue};
+    use crate::compiler::Compiler;
     use crate::opcodes::{Instr, AdrMode};
 
     #[test]
@@ -120,5 +121,25 @@ mod tests {
             Expr::INSTR(Instr::BNE, AdrMode::REL, Operand::LABEL("start".to_owned()))
         ];
         assert_eq!(prog.unwrap(), lines);
+    }
+
+    #[test]
+    fn simple_compilation() {
+        let source =String::from(r##"
+            ; should be ignored
+            also_ignored:
+            ignored = 1 + %101 * ($ff - 3)  
+            .byte "HELLO WORLD" ; also ignored
+            .dword "LLHH", $00ff
+            LDA #$a
+        "##);
+        let mut compiler = Compiler::new(None);
+        compiler.init_source(&source).unwrap();
+        let hex_string = compiler.to_hex_string().unwrap();
+        let bytes = compiler.to_byte_code().unwrap();
+        assert_eq!(hex_string, "48 45 4c 4c 4f 20 57 4f 52 4c 44 4c 4c 48 48 ff 00 a9 0a");
+        assert_eq!(bytes, vec![
+            72, 69, 76, 76, 79, 32, 87, 79, 82, 76, 68, 76, 76, 72, 72, 255, 0, 169, 10
+        ]);
     }
 }

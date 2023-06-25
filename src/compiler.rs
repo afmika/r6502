@@ -71,7 +71,18 @@ impl Compiler {
         Ok(())
     }
 
-    /// Compile source code to contiguous bytes 
+    /// Compile source code to hex string
+    pub fn to_hex_string(&mut self) -> Result<String, String>{
+        let buffer = self.to_byte_code()?;
+        let mut out = String::new();
+        for byte in buffer {
+            let hex = format!("{:#04x} ", byte);
+            out.push_str(hex.strip_prefix("0x").unwrap());
+        }
+        Ok(out.trim().to_owned())
+    }
+
+    /// Compile source code to contiguous bytes
     pub fn to_byte_code(&mut self) -> Result<Vec<u8>, String> {
         let mut program: Vec<u8> = vec![];
         self.prog_counter = 0;
