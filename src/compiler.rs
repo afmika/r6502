@@ -1,5 +1,5 @@
 use std::{
-    path::{PathBuf, Path}, 
+    path::Path, 
     collections::HashMap, io::Write
 };
 use crate::{
@@ -150,7 +150,7 @@ impl Compiler {
                             if num.size == 8 {
                                 program.push(num.value as u8);
                             } else {
-                                let hi: u8 = ((num.value & 0xff00) >> 8) as u8;
+                                let hi = ((num.value & 0xff00) >> 8) as u8;
                                 let lo = (num.value & 0x00ff) as u8;
                                 // little-endian
                                 program.push(lo);
@@ -167,7 +167,11 @@ impl Compiler {
         Ok(program)
     }
 
-    pub fn write(path: PathBuf) {
-        println!("{} bytes written to {:?}", 0, path);
+    pub fn get_parse_string(&self) -> String {
+        self.lines
+            .iter()
+            .map(|v| format!("{:?}", v))
+            .collect::<Vec<String>>()
+            .join("\n")
     }
 }

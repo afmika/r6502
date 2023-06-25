@@ -414,9 +414,9 @@ impl<'a> AsmParser<'a> {
     // expr should guarantee to be not recursive
     pub fn eval_math(&self, expr: &MathExpr) -> Result<NumericValue, String> {
         match expr {
-            MathExpr::BIN(op, L, R) => {
-                let left = self.eval_math(L)?;
-                let right = self.eval_math(R)?;
+            MathExpr::BIN(op, rvalue, lvalue) => {
+                let left = self.eval_math(&lvalue)?;
+                let right = self.eval_math(&rvalue)?;
                 let value = match op {
                     Token::PLUS => {
                         if left.value.checked_add(right.value).is_none() {
@@ -460,9 +460,9 @@ impl<'a> AsmParser<'a> {
     pub fn validate_factors(&self, expr: &MathExpr, assignee: &Option<String>) -> Result<bool, String> {
         match expr {
             MathExpr::NUM(_) => Ok(true),
-            MathExpr::BIN(_, L, R) => {
-                let left = self.validate_factors(L, assignee)?;
-                let right = self.validate_factors(R, assignee)?;
+            MathExpr::BIN(_, lvalue, rvalue) => {
+                let left = self.validate_factors(&lvalue, assignee)?;
+                let right = self.validate_factors(&rvalue, assignee)?;
                 Ok(left && right)
             },
             MathExpr::PLACEHOLDER(s) => {
