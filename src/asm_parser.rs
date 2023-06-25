@@ -42,21 +42,21 @@ pub enum Directive {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NumericValue {
-    value: u32,
-    size: u32
+    pub value: u16,
+    pub size: usize
 }
 
 fn canonicalize_number(n: &Token) -> Result<NumericValue, String> {
     match n {
         Token::BIN(bin) => {
-            let value: u32 = u32::from_str_radix(bin, 2).unwrap();
+            let value: u16 = u16::from_str_radix(bin, 2).unwrap();
             if bin.len() > 8 {
                 return Ok(NumericValue { value, size: 16 })
             }
             Ok(NumericValue { value, size: 8 })
         },
         Token::DEC(dec) => {
-            let value: u32 = u32::from_str_radix(dec, 10).unwrap();
+            let value: u16 = u16::from_str_radix(dec, 10).unwrap();
             // ex: 256 or 00001 shall be considered as 16 bits
             if value > 255 || dec.len() > 3 {
                 return Ok(NumericValue { value, size: 16 })
@@ -64,14 +64,14 @@ fn canonicalize_number(n: &Token) -> Result<NumericValue, String> {
             Ok(NumericValue { value, size: 8 })
         },
         Token::HEX(hex) => {
-            let value: u32 = u32::from_str_radix(hex, 16).unwrap();
+            let value: u16 = u16::from_str_radix(hex, 16).unwrap();
             if hex.len() > 2 {
                 return Ok(NumericValue { value, size: 16 })
             }
             Ok(NumericValue { value, size: 8 })
         },
         Token::CHAR(ch) => {
-            let value: u32 = ch.chars().next().unwrap() as u32;
+            let value: u16 = ch.chars().next().unwrap() as u16;
             Ok(NumericValue { value, size: 8 })
         },
         token => {
@@ -287,7 +287,7 @@ impl<'a> AsmParser<'a> {
         }
     }
 
-    fn consume_sequence(&mut self, size: u32) -> Result<Vec<NumericValue>, String>  {
+    fn consume_sequence(&mut self, size: usize) -> Result<Vec<NumericValue>, String>  {
         if size != 8 && size != 16 {
             return Err(format!("size must be 8 or 16, {} was given", size));
         }
@@ -305,14 +305,14 @@ impl<'a> AsmParser<'a> {
                         while pos < list.len() {
                             let hi = list[pos] as u16;
                             let lo = list[pos + 1] as u16;
-                            let value = ((hi << 8) | lo) as u32;
+                            let value = (hi << 8) | lo;
                             seq.push(NumericValue {value, size});
                             pos += 2;
                         }
                     } else {
                         // == 8
                         for ch in s.chars() {
-                            let value = ch as u32;
+                            let value = ch as u16;
                             seq.push(NumericValue { value, size: 8 });
                         }
                     }
