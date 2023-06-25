@@ -29,7 +29,7 @@ Options:
 ```
 
 ## Todo
-* Compile flag for NES rom
-- segment
-- program entry point
-- export, include
+- compile flag for NES rom
+  - segment (header, code, chars, ...)
+  - program entry point
+  - export, include
