@@ -511,7 +511,7 @@ impl<'a> AsmParser<'a> {
         self.next();
 
         // none
-        if *self.curr() == Token::NEWLINE || *self.curr() == Token::EOF {
+        if self.is_endline() || self.is_eof() || self.is_comment() {
             return Ok(Expr::INSTR(instr, AdrMode::IMPL, Operand::NONE));
         }
 

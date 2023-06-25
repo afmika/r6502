@@ -46,29 +46,30 @@ pub fn get_opcode(
     let opcodes = OPCODES.get(&(instr.clone(), mode.clone()));
     if let Some(opcodes) = opcodes {
         if let Some(ref config) = config {
-            if config.allow_illegal {
-                let mut official: Option<Opcode> = None;
-                for opcode in opcodes {
-                    for hex in config.allow_list.borrow().deref() {
-                        if opcode.hex == *hex {
-                            return Ok(opcode.to_owned());
-                        }
-                        if opcode.official {
-                            official = Some(opcode.to_owned());
-                        }
+            for opcode in opcodes {
+                for given in config.allow_list.borrow().deref() {
+                    if config.allow_illegal && opcode.hex == *given {
+                        return Ok(opcode.to_owned());
                     }
                 }
-                // fallback to official if no hit
-                if let Some(opcode) = official {
-                    return Ok(opcode);
-                }
             }
-        } else {
-            // only allow official
-            for opcode in opcodes {
-                if opcode.official {
-                    return Ok(opcode.to_owned());
-                }
+            // allow list does not match, just return whatever we get
+            // but prioritize official
+            let official: Vec<Opcode> = opcodes
+                .iter()
+                .filter(|op| op.official)
+                .map(|op| op.to_owned())
+                .collect();
+            if official.len() > 0 {
+                return Ok(official.get(0).unwrap().to_owned());
+            } else {
+                return Ok(opcodes.get(0).unwrap().to_owned());
+            }
+        }
+        // try official if above failed or is None
+        for opcode in opcodes {
+            if opcode.official {
+                return Ok(opcode.to_owned());
             }
         }
     }

@@ -133,19 +133,22 @@ mod tests {
             ignored = 1 + %101 * ($ff - 3)  
             .byte "HELLO WORLD" ; also ignored
             .dword "LLHH", $00ff
-            LDA #$a ; non official
+            LAX #$a ; non official
             LDA ($ff), y ; official
+            NOP ; emit non official nop
         "##);
         let mut compiler = Compiler::new(Some(CompilerConfig {
             allow_illegal: true,
-            allow_list: RefCell::new(vec![0xA9])
+            allow_list: RefCell::new(vec![
+                0xDA // non official op
+            ])
         }));
         compiler.init_source(&source).unwrap();
         let hex_string = compiler.to_hex_string().unwrap();
         let bytes = compiler.to_byte_code().unwrap();
-        assert_eq!(hex_string, "48 45 4c 4c 4f 20 57 4f 52 4c 44 4c 4c 48 48 ff 00 a9 0a b1 ff");
+        assert_eq!(hex_string, "48 45 4c 4c 4f 20 57 4f 52 4c 44 4c 4c 48 48 ff 00 ab 0a b1 ff da");
         assert_eq!(bytes, vec![
-            72, 69, 76, 76, 79, 32, 87, 79, 82, 76, 68, 76, 76, 72, 72, 255, 0, 169, 10, 177, 255
+            72, 69, 76, 76, 79, 32, 87, 79, 82, 76, 68, 76, 76, 72, 72, 255, 0, 171, 10, 177, 255, 218
         ]);
     }
 }
