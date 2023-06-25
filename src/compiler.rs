@@ -1,14 +1,31 @@
 use std::{
     path::Path, 
-    collections::HashMap, io::Write
+    collections::HashMap, 
+    io::Write, 
+    cell::RefCell
 };
+
+use lazy_static::__Deref;
+
 use crate::{
-    asm_parser::{Expr, Operand, Directive, AsmParser}, 
-    opcodes::{OPCODES, AdrMode, Instr}, asm_lexer::AsmLexer
+    asm_parser::{
+        Expr, 
+        Operand, 
+        Directive, 
+        AsmParser
+    }, 
+    opcodes::{
+        OPCODES, 
+        AdrMode, 
+        Instr, 
+        Opcode
+    }, 
+    asm_lexer::AsmLexer
 };
 
 use std::fs;
 
+// Examples:
 // Absolute Y: AND $4400,Y consumes $44 and $00, Y is for notation
 // Indirect X: AND ($44,X) consumes $44 only, X is for notation
 // Zero Page, Immediate : AND $44 consumes $44 only
@@ -21,9 +38,49 @@ pub fn canonical_op_len(adr_mode: &AdrMode) -> i8 {
     }
 }
 
+pub fn get_opcode(
+    instr: Instr, 
+    mode: AdrMode, 
+    config: Option<CompilerConfig>
+) -> Result<Opcode, String> {
+    let opcodes = OPCODES.get(&(instr.clone(), mode.clone()));
+    if let Some(opcodes) = opcodes {
+        if let Some(ref config) = config {
+            if config.allow_illegal {
+                let mut official: Option<Opcode> = None;
+                for opcode in opcodes {
+                    for hex in config.allow_list.borrow().deref() {
+                        if opcode.hex == *hex {
+                            return Ok(opcode.to_owned());
+                        }
+                        if opcode.official {
+                            official = Some(opcode.to_owned());
+                        }
+                    }
+                }
+                // fallback to official if no hit
+                if let Some(opcode) = official {
+                    return Ok(opcode);
+                }
+            }
+        } else {
+            // only allow official
+            for opcode in opcodes {
+                if opcode.official {
+                    return Ok(opcode.to_owned());
+                }
+            }
+        }
+    }
+    Err(format!("instruction ({}, {:?}) does not exist", instr, mode))
+}
+
+#[derive(Debug, Clone)]
 pub struct CompilerConfig {
+    /// Allow illegal opcode
     pub allow_illegal: bool,
-    pub opcodes: Option<HashMap<(Instr, AdrMode), u8>>
+    /// Illegal opcodes will be picked using this list as hint
+    pub allow_list: RefCell<Vec<u8>>
 }
 
 pub struct Compiler {
@@ -109,22 +166,15 @@ impl Compiler {
                                 program.push(hi);
                             }
                         },
-                        Directive::ENDPROC => todo!(),
-                        Directive::PROC(_) => todo!(),
-                        Directive::SEGMENT(_) => todo!(),
+                        Directive::ENDPROC => todo!("nes rom"),
+                        Directive::PROC(_) => todo!("nes rom"),
+                        Directive::SEGMENT(_) => todo!("nes rom"),
                     }
                 },
                 Expr::INSTR(name, mode, op) => {
-                    let opcode = OPCODES.get(&(name.to_owned(), mode.to_owned()));
-                    if let Some(list) = opcode {
-                        assert!(list.len() > 0);
-                        // TODO: use config for non-documented opcodes
-                        let opcode = list.get(0).unwrap();
-                        program.push(opcode.hex);
-                        self.prog_counter += 1; // instruction
-                    } else {
-                        return Err(format!("instruction ({}, {:?}) does not exist", name, mode));
-                    }
+                    let opcode = get_opcode(name.to_owned(), mode.to_owned(), self.config.to_owned())?;
+                    program.push(opcode.hex);
+                    self.prog_counter += 1; // instruction
                     match op {
                         Operand::LABEL(name) => {
                             let pos = self.label_pos.get(name);

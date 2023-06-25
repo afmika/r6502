@@ -13,7 +13,7 @@ enum Mode {
 }
 
 #[derive(Parser, Debug)]
-#[command(version = "0.0.1", about = "6502 assembly compiler", long_about = None)]
+#[command(version = "0.0.2", about = "6502 assembly compiler", long_about = None)]
 struct Args {
     /// File path
     file: String,
@@ -22,6 +22,9 @@ struct Args {
     /// Output mode
     #[clap(subcommand)]
     mode: Option<Mode>
+
+    // todo
+    // add allow illegal + allow_list=hex list (should support any format)
 }
 
 fn main() -> Result<(), String> {
@@ -41,9 +44,7 @@ fn main() -> Result<(), String> {
                 let hex_string = compiler.to_hex_string()?;
                 print!("{}", hex_string);
             },
-            Mode::Parse => {
-                print!("{}", compiler.get_parse_string());
-            }
+            Mode::Parse => print!("{}", compiler.get_parse_string()),
         }
     } else {
         compiler.run(&output)?;

@@ -4,5 +4,6 @@ y = $ff
 start:
 .db "DE"
 .dw "AB", $ffff, 'A', 'A'+3, y
-LDA #$ff01
+; LDA #$a ; non official
+LDA ($ff), y ; official
 .db "HELLO WORLD"

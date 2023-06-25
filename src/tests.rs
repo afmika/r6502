@@ -1,8 +1,10 @@
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+
     use crate::asm_lexer::{AsmLexer, Token};
     use crate::asm_parser::{AsmParser, Expr, Directive, Operand, MathExpr, NumericValue};
-    use crate::compiler::Compiler;
+    use crate::compiler::{Compiler, CompilerConfig};
     use crate::opcodes::{Instr, AdrMode};
 
     #[test]
@@ -131,15 +133,19 @@ mod tests {
             ignored = 1 + %101 * ($ff - 3)  
             .byte "HELLO WORLD" ; also ignored
             .dword "LLHH", $00ff
-            LDA #$a
+            LDA #$a ; non official
+            LDA ($ff), y ; official
         "##);
-        let mut compiler = Compiler::new(None);
+        let mut compiler = Compiler::new(Some(CompilerConfig {
+            allow_illegal: true,
+            allow_list: RefCell::new(vec![0xA9])
+        }));
         compiler.init_source(&source).unwrap();
         let hex_string = compiler.to_hex_string().unwrap();
         let bytes = compiler.to_byte_code().unwrap();
-        assert_eq!(hex_string, "48 45 4c 4c 4f 20 57 4f 52 4c 44 4c 4c 48 48 ff 00 a9 0a");
+        assert_eq!(hex_string, "48 45 4c 4c 4f 20 57 4f 52 4c 44 4c 4c 48 48 ff 00 a9 0a b1 ff");
         assert_eq!(bytes, vec![
-            72, 69, 76, 76, 79, 32, 87, 79, 82, 76, 68, 76, 76, 72, 72, 255, 0, 169, 10
+            72, 69, 76, 76, 79, 32, 87, 79, 82, 76, 68, 76, 76, 72, 72, 255, 0, 169, 10, 177, 255
         ]);
     }
 }
