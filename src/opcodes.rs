@@ -7,8 +7,7 @@ pub enum AdrMode {
     ABSX, ABSY,
     ZP, ZPX, ZPY,
     IND, INDX, INDY,
-    REL, 
-    UNKNOWN // fallback for math expr
+    REL
 }
 
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
@@ -43,23 +42,10 @@ impl Display for Instr {
     }
 }
 
-// Absolute Y: AND $4400,Y consumes $44 and $00, Y is for notation
-// Indirect X: AND ($44,X) consumes $44 only, X is for notation
-// Zero Page, Immediate : AND $44 consumes $44 only
-pub fn canonical_op_len(adr_mode: &AdrMode) -> i8 {
-    match adr_mode {
-        AdrMode::UNKNOWN => -1,
-        AdrMode::IMPL => 0,
-        AdrMode::IMM | AdrMode::ZP | AdrMode::ZPX | AdrMode::ZPY 
-        | AdrMode::INDX | AdrMode::INDY | AdrMode::REL => 1,
-        AdrMode::ABS | AdrMode::ABSX | AdrMode::ABSY | AdrMode::IND => 2,
-    }
-}
-
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct Opcode {
-    hex: u8,
-    examples: Vec<String>
+    pub hex: u8,
+    pub examples: Vec<String>
 }
 
 impl Opcode {

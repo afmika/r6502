@@ -33,11 +33,15 @@ pub enum MathExpr {
 pub enum Directive {
     // TODO
     // EXPORT, INCLUDE(String),
-    ENDPROC, PROC(String),                 // .proc main 
-    SEGMENT(String),                       // .segment "NAME"
     // ENDMACRO, MACRO(String, Vec<String>)   // .macro NAME arg1 arg2 ... argN (.*)\n endmacro
-    BYTE(Vec<NumericValue>),                  // (.db, .byte) 1, 2, 3, ... 8 bit, can be strings
-    DWORD(Vec<NumericValue>),                 // .dw 1, 2, 3, ... (16 bits)
+    /// .proc main 
+    ENDPROC, PROC(String),
+    /// .segment "NAME"
+    SEGMENT(String),
+    /// (.db | .byte) 1, 2, 3, ... 8 bit, can be strings
+    BYTE(Vec<NumericValue>),
+    /// .dw 1, 2, 3, ... (16 bits)
+    DWORD(Vec<NumericValue>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -100,7 +104,7 @@ fn is_branching(i: &Instr) -> bool {
         }
     }
     false
-} 
+}
 
 
 pub struct AsmParser<'a> {
@@ -122,7 +126,7 @@ impl<'a> AsmParser<'a> {
         let mut prog = Vec::new();
         self.cursor = 0;
         loop {
-            println!("{:?}", self.curr().clone());
+            // println!("{:?}", self.curr().clone());
             // cleanup
             if self.is_eof() {
                 break;
@@ -158,6 +162,7 @@ impl<'a> AsmParser<'a> {
                 }
             }
 
+            // directive and comment
             match self.curr().clone() {
                 Token::DIRECTIVE(name) => {
                     match name.as_str() {
@@ -189,6 +194,10 @@ impl<'a> AsmParser<'a> {
                             return Err(self.curr_unexpected());
                         }
                     }
+                    continue;
+                },
+                Token::COMMENT(..) => {
+                    self.next();
                     continue;
                 },
                 _ => {}
@@ -545,7 +554,6 @@ impl<'a> AsmParser<'a> {
 
             let number = canonicalize_number(self.curr())?;
             if number.size > 8 {
-                // indirect
                 let op = Operand::VALUE(number);
                 self.next();
                 self.consume(Token::PARENTCLOSE)?;

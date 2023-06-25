@@ -2,7 +2,7 @@ use r6502::{
     asm_lexer::{
         AsmLexer, 
         Token
-    }, asm_parser::AsmParser
+    }, asm_parser::AsmParser, compiler::Compiler
 };
 
 fn sample_test() {
@@ -95,7 +95,26 @@ fn parser_test() {
     }
 }
 
+fn compile_test() {
+    let source =String::from(r##"
+        ; this is a test program
+        y = 3
+        .byte "AB", 67, y
+        .db "DE"
+        .dw "AB", $ffff, 'A', 'A'+3, y
+        LDA #$ff01
+        .db "HELLO WORLDS"
+    "##);
+    let mut compiler = Compiler::new(None);
+    compiler.init_source(&source).unwrap();
+    let code = compiler.to_byte_code().unwrap();
+    println!("{:?}", code);
+    compiler.run("out.bin").unwrap();
+}
+
+
 fn main() {
     // sample_test();
-    parser_test();
+    // parser_test();
+    compile_test();
 }
