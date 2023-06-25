@@ -33,8 +33,8 @@ pub enum MathExpr {
 pub enum Directive {
     // TODO
     // EXPORT, INCLUDE(String),
-    // ENDPROC, PROC(String),                 // .proc main 
-    // SEGMENT(String),                       // .segment "NAME"
+    ENDPROC, PROC(String),                 // .proc main 
+    SEGMENT(String),                       // .segment "NAME"
     // ENDMACRO, MACRO(String, Vec<String>)   // .macro NAME arg1 arg2 ... argN (.*)\n endmacro
     BYTE(Vec<NumericValue>),                  // (.db, .byte) 1, 2, 3, ... 8 bit, can be strings
     DWORD(Vec<NumericValue>),                 // .dw 1, 2, 3, ... (16 bits)
@@ -170,7 +170,21 @@ impl<'a> AsmParser<'a> {
                             self.next();
                             let seq = self.consume_sequence(16)?;
                             prog.push(Expr::DIRECTIVE(Directive::DWORD(seq)));
-                        }
+                        },
+                        "segment" => {
+                            self.next();
+                            let segname: String = self.consume_string_and_lift()?;
+                            prog.push(Expr::DIRECTIVE(Directive::SEGMENT(segname)));
+                        },
+                        "proc" => {
+                            self.next();
+                            let procname: String = self.consume_literal_and_lift()?;
+                            prog.push(Expr::DIRECTIVE(Directive::PROC(procname)));
+                        },
+                        "endproc" => {
+                            self.next();
+                            prog.push(Expr::DIRECTIVE(Directive::ENDPROC));
+                        },
                         _ => {
                             return Err(self.curr_unexpected());
                         }
@@ -244,6 +258,17 @@ impl<'a> AsmParser<'a> {
                 Ok(lit)
             },
             token => Err(format!("literal was expected, got {:?} instead",token))
+        }
+    }
+
+    fn consume_string_and_lift(&mut self) -> Result<String, String> {
+        let curr = self.curr().clone();
+        match curr {
+            Token::STR(s) => {
+                self.next();
+                Ok(s)
+            },
+            token => Err(format!("string was expected, got {:?} instead", token))
         }
     }
 

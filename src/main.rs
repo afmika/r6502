@@ -74,10 +74,15 @@ fn parser_test() {
 
         bmi $BB
 
-        y = 12645768
+        .segment "HEADER"
+        y = 5
         .byte "AB", 67, y
         .db "DE"
         .dword "AB", $ffff, 'A', 'A'+3, y
+
+        .proc main
+        .db "DE"
+        .endproc
 "##
         )
     );
