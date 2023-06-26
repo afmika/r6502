@@ -27,9 +27,10 @@ fn simple_compilation() {
 #[test]
 fn compile_illegal() {
     let source =String::from(r##"
-        LAX #$a         ; non official
-        LDA ($ff), y    ; official
-        NOP             ; official, but let's emit non-official opcode
+        x = %010
+        LAX #$a                        ; non official
+        LDA ($f0 + (x * 8 - $1)), y    ; official
+        NOP                            ; official, but let's emit non-official opcode
     "##);
     let mut compiler = Compiler::new(Some(CompilerConfig {
         allow_illegal: true,
