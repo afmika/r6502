@@ -155,6 +155,7 @@ impl Compiler {
                             for item in seq {
                                 assert!(item.size == 8);
                                 program.push(item.value as u8);
+                                self.prog_counter += 1;
                             }
                         },
                         Directive::DWORD(seq) => {
@@ -165,6 +166,7 @@ impl Compiler {
                                 // little-endian
                                 program.push(lo);
                                 program.push(hi);
+                                self.prog_counter += 2;
                             }
                         },
                         Directive::ENDPROC => todo!("nes rom"),
@@ -176,22 +178,18 @@ impl Compiler {
                     let opcode = get_opcode(name.to_owned(), mode.to_owned(), self.config.to_owned())?;
                     program.push(opcode.hex);
                     self.prog_counter += 1; // instruction
+                    let initial_size = program.len();
                     match op {
                         Operand::LABEL(name) => {
                             let pos = self.label_pos.get(name);
                             if let Some(pos) = pos {
                                 // [pos] .......... [pc]
                                 // delta = pc - pos
-                                // pc <- pc - delta = pc - (pc - pos) = pos
-                                let delta = self.prog_counter as isize - pos;
-                                if delta > 127 {
-                                    return Err(format!("label jump too large {}({}) > 127", delta, name));
+                                let offset = self.prog_counter as isize - pos;
+                                if offset > 127 {
+                                    return Err(format!("relative offset too large {}({}) > 127", offset, name));
                                 }
-                                let hi = ((pos & 0xff00) >> 8) as u8;
-                                let lo = (pos & 0x00ff) as u8;
-                                // little-endian
-                                program.push(lo);
-                                program.push(hi);
+                                program.push(offset as u8);
                             } else {
                                 todo!("jump ahead 128 bytes");
                             }
@@ -210,6 +208,8 @@ impl Compiler {
                         },
                         Operand::NONE => {},
                     }
+                    let diff = program.len() - initial_size;
+                    assert_eq!(diff as i8, canonical_op_len(&mode), "invalid operand size");
                     self.prog_counter += canonical_op_len(&mode) as usize; // operand
                 },
                 Expr::ASSIGN(..) => {}, // evaluated at parse time

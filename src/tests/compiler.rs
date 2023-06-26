@@ -6,20 +6,21 @@ use crate::compiler::{Compiler, CompilerConfig};
 fn simple_compilation() {
     let source =String::from(r##"
         ; should be ignored
-        also_ignored:
-        ignored = 1 + %101 * ($ff - 3)  
-        .byte "HELLO WORLD"                 ; also ignored
+        ignored = 1 + %101 * ($ff - 3)      ; also ignored
+        .byte "HELLO WORLD"                 
         .dword "LLHH", $00ff
+        also_ignored:
         LDA ($ff), y                        ;  official
         NOP
+        BNE also_ignored
     "##);
     let mut compiler = Compiler::new(None);
     compiler.init_source(&source).unwrap();
     let hex_string = compiler.to_hex_string().unwrap();
     let bytes = compiler.to_byte_code().unwrap();
-    assert_eq!(hex_string, "48 45 4c 4c 4f 20 57 4f 52 4c 44 4c 4c 48 48 ff 00 b1 ff ea");
+    assert_eq!(hex_string, "48 45 4c 4c 4f 20 57 4f 52 4c 44 4c 4c 48 48 ff 00 b1 ff ea d0 04");
     assert_eq!(bytes, vec![
-        72, 69, 76, 76, 79, 32, 87, 79, 82, 76, 68, 76, 76, 72, 72, 255, 0, 177, 255, 234
+        72, 69, 76, 76, 79, 32, 87, 79, 82, 76, 68, 76, 76, 72, 72, 255, 0, 177, 255, 234, 208, 4
     ]);
 }
 
