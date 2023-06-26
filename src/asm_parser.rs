@@ -42,6 +42,8 @@ pub enum Directive {
     BYTE(Vec<NumericValue>),
     /// .dw 1, 2, 3, ... (16 bits)
     DWORD(Vec<NumericValue>),
+    /// .res N_BYTES
+    RESERVE(usize)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -189,6 +191,19 @@ impl<'a> AsmParser<'a> {
                         "endproc" => {
                             self.next();
                             prog.push(Expr::DIRECTIVE(Directive::ENDPROC));
+                        },
+                        "res" => {
+                            self.next();
+                            match self.curr() {
+                                Token::DEC(n) => {
+                                    let size = usize::from_str_radix(&n, 10).unwrap();
+                                    self.next();
+                                    prog.push(Expr::DIRECTIVE(Directive::RESERVE(size)));
+                                },
+                                tk => {
+                                    return Err(format!("decimal number was expected, got {:?}", tk));
+                                }
+                            }
                         },
                         _ => {
                             return Err(self.curr_unexpected());

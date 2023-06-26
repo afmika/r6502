@@ -80,6 +80,8 @@ pub fn get_opcode(
 pub struct CompilerConfig {
     /// Allow illegal opcode
     pub allow_illegal: bool,
+    /// Compile for NES
+    pub enable_nes: bool,
     /// Illegal opcodes will be picked using this list as hint
     pub allow_list: RefCell<Vec<u8>>
 }
@@ -146,6 +148,7 @@ impl Compiler {
     pub fn to_byte_code(&mut self) -> Result<Vec<u8>, String> {
         let mut program: Vec<u8> = vec![];
         self.prog_counter = 0;
+        let mut header_index = 0;
         for line in &self.lines {
             match line {
                 Expr::LABEL(label) => {
@@ -171,9 +174,43 @@ impl Compiler {
                                 self.prog_counter += 2;
                             }
                         },
+                        Directive::SEGMENT(dir_name) => {
+                            if !self.use_nes() {
+                                return Err(format!("segment directive for nes assembly mode not enabled"))
+                            }
+                            match dir_name.as_str() {
+                                "HEADER" => {
+                                    if self.prog_counter > 0 {
+                                        return Err(format!("segment HEADER must be at the start of the program"))
+                                    }
+                                    header_index += 1;
+                                },
+                                "CODE" => {
+                                    if header_index < 1 {
+                                        return Err(format!("segment HEADER not provided before segment CODE"));
+                                    }
+                                    header_index += 1;
+                                },
+                                "VECTORS" => {
+                                    if header_index < 1 {
+                                        return Err(format!("segment HEADER not provided before segment VECTORS"));
+                                    }
+                                    header_index += 1;
+                                },
+                                "CHARS" => {
+                                    if header_index < 1 {
+                                        return Err(format!("segment HEADER not provided before segment VECTORS"));
+                                    }
+                                    header_index += 1
+                                },
+                                other => {
+                                    return Err(format!("segment {:?} not supported", other))
+                                }
+                            }
+                        },
+                        Directive::RESERVE(bytes) => todo!("nes rom :: allocation {} not possible", bytes),
                         Directive::ENDPROC => todo!("nes rom"),
                         Directive::PROC(_) => todo!("nes rom"),
-                        Directive::SEGMENT(_) => todo!("nes rom"),
                     }
                 },
                 Expr::INSTR(name, mode, op) => {
@@ -248,5 +285,14 @@ impl Compiler {
             .map(|v| format!("{:?}", v))
             .collect::<Vec<String>>()
             .join("\n")
+    }
+
+    pub fn use_nes(&self) -> bool {
+        if let Some(config) = &self.config {
+            if config.enable_nes {
+                return true;
+            }
+        }
+        false
     }
 }

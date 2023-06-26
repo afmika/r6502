@@ -36,6 +36,7 @@ fn compile_illegal() {
     "##);
     let mut compiler = Compiler::new(Some(CompilerConfig {
         allow_illegal: true,
+        enable_nes: false,
         allow_list: RefCell::new(vec![
             0xDA // non official op
         ])

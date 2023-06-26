@@ -58,6 +58,7 @@ fn basic_lexing() {
 fn simple_parsing() {
     let mut lexer = AsmLexer::new(&String::from(r##"
         ; Example program
+        .res 1234
         .segment "SOME SEGMENT"
         x = 1 + 2 * 3
         .byte "ABC", 'C' + 1, %001 + 2*x
@@ -71,6 +72,7 @@ fn simple_parsing() {
     let mut parser = AsmParser::new(&tokens);
     let prog = parser.parse();
     let lines = vec![
+        Expr::DIRECTIVE(Directive::RESERVE(1234)),
         Expr::DIRECTIVE(Directive::SEGMENT("SOME SEGMENT".to_owned())), 
         Expr::ASSIGN(
             "x".to_owned(), 
@@ -115,7 +117,7 @@ fn simple_parsing() {
                     )
                 )), 
         Expr::LABEL("start".to_owned()), 
-        Expr::INSTR(Instr::BNE, AdrMode::REL, Operand::LABEL("start".to_owned()))
+        Expr::INSTR(Instr::BNE, AdrMode::REL, Operand::LABEL("start".to_owned())),
     ];
     assert_eq!(prog.unwrap(), lines);
 }
