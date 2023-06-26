@@ -53,7 +53,7 @@ pub fn get_opcode(
                     }
                 }
             }
-            // allow list does not match, just return whatever we get
+            // allow_list does not match, just return whatever we get
             // but prioritize official
             let official: Vec<Opcode> = opcodes
                 .iter()
