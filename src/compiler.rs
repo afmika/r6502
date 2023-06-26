@@ -88,6 +88,7 @@ pub struct Compiler {
     lines: Vec<Expr>,
     prog_counter: usize,
     label_pos: HashMap<String, isize>,
+    jumpto_pos: HashMap<String, isize>,
     config: Option<CompilerConfig>
 }
 
@@ -99,6 +100,7 @@ impl Compiler {
             lines: vec![],
             prog_counter: 0,
             label_pos: HashMap::new(),
+            jumpto_pos: HashMap::new(),
             config
         }
     }
@@ -178,21 +180,13 @@ impl Compiler {
                     let opcode = get_opcode(name.to_owned(), mode.to_owned(), self.config.to_owned())?;
                     program.push(opcode.hex);
                     self.prog_counter += 1; // instruction
+
                     let initial_size = program.len();
                     match op {
                         Operand::LABEL(name) => {
-                            let pos = self.label_pos.get(name);
-                            if let Some(pos) = pos {
-                                // [pos] .......... [pc]
-                                // delta = pc - pos
-                                let offset = self.prog_counter as isize - pos;
-                                if offset > 127 {
-                                    return Err(format!("relative offset too large {}({}) > 127", offset, name));
-                                }
-                                program.push(offset as u8);
-                            } else {
-                                todo!("jump ahead 128 bytes");
-                            }
+                            self.jumpto_pos.insert(name.to_owned(), self.prog_counter as isize);
+                            // just a placeholder
+                            program.push(0xab);
                         },
                         Operand::VALUE(num) => {
                             assert!(num.size == 8 || num.size == 16);
@@ -213,6 +207,36 @@ impl Compiler {
                     self.prog_counter += canonical_op_len(&mode) as usize; // operand
                 },
                 Expr::ASSIGN(..) => {}, // evaluated at parse time
+            }
+        }
+
+        // now resolve the jumps
+        for (label, pos) in &self.jumpto_pos {
+            match self.label_pos.get(label) {
+                Some(lab_pos) => {
+                    // [pos] .......... [pc]
+                    // delta = pc - pos
+                    let sign = if pos >= lab_pos {-1} else {1};
+                    let mut offset = (pos - lab_pos).abs();
+                    if sign * offset < -127 {
+                        return Err(format!("relative offset too large {}({}) < -128", offset, label));
+                    }
+                    if sign * offset > 127 {
+                        return Err(format!("relative offset too large {}({}) > 127", offset, label));
+                    }
+                    if sign < 0 {
+                        // BNE my_label <= pc is at my_label, so move -1
+                        offset += 1;
+                    } else {
+                        // BNE my_label <= pc will move ahead so no need to change
+                    }
+                    let sg_offset = offset * sign;
+                    println!("{} :: {}", label, sg_offset);
+                    program[*pos as usize] = sg_offset as u8;
+                },
+                None => {
+                    return Err(format!("unable to jump to invalid label {:?}", label))
+                }
             }
         }
         Ok(program)

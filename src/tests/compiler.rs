@@ -8,7 +8,7 @@ fn simple_compilation() {
         ; should be ignored
         ignored = 1 + %101 * ($ff - 3)      ; also ignored
         .byte "HELLO WORLD"                 
-        also_ignored:                       ; offset = 8 + 2 = 10 = $0a
+        also_ignored:                       ; offset = -(8 + 2) = -10 = -$0a = $f5 (cast to unsigned)
         .dword "LLHH", $00ff
         LDA ($ff), y                        ;  official
         NOP
@@ -18,9 +18,10 @@ fn simple_compilation() {
     compiler.init_source(&source).unwrap();
     let hex_string = compiler.to_hex_string().unwrap();
     let bytes = compiler.to_byte_code().unwrap();
-    assert_eq!(hex_string, "48 45 4c 4c 4f 20 57 4f 52 4c 44 4c 4c 48 48 ff 00 b1 ff ea d0 0a");
+    assert_eq!(hex_string, "48 45 4c 4c 4f 20 57 4f 52 4c 44 4c 4c 48 48 ff 00 b1 ff ea d0 f5");
     assert_eq!(bytes, vec![
-        72, 69, 76, 76, 79, 32, 87, 79, 82, 76, 68, 76, 76, 72, 72, 255, 0, 177, 255, 234, 208, 10
+        72, 69, 76, 76, 79, 32, 87, 79, 82, 76, 68, 76, 76, 72, 72, 255, 0, 177, 255, 234, 
+        208, 245 // given that $f5 (unsigned) == -$0a
     ]);
 }
 
@@ -47,6 +48,43 @@ fn compile_illegal() {
         171, 10, 177, 255, 218
     ]);
 }
+
+#[test]
+fn jump_ahead() {
+    let source =String::from(r##"
+        LDA #$00
+        BNE my_label ; d0 08 
+        ADC #$02
+        TAX
+        CPX #100
+        BNE $02
+        my_label:
+        NOP
+    "##);
+    let mut compiler = Compiler::new(None);
+    compiler.init_source(&source).unwrap();
+    let hex_string = compiler.to_hex_string().unwrap();
+    assert_eq!(hex_string, "a9 00 d0 08 69 02 aa e0 64 d0 02 ea");
+}
+
+#[test]
+fn jump_behind() {
+    let source =String::from(r##"
+        LDA #$00
+        my_label:
+        ADC #$02
+        TAX
+        CPX #100
+        BNE $02
+        BNE my_label ; d0 -$08 == d0 $f7 (after cast to unsigned)
+        NOP
+    "##);
+    let mut compiler = Compiler::new(None);
+    compiler.init_source(&source).unwrap();
+    let hex_string = compiler.to_hex_string().unwrap();
+    assert_eq!(hex_string, "a9 00 69 02 aa e0 64 d0 02 d0 f7 ea");
+}
+
 
 #[test]
 fn mode_and_math_expansion() {
