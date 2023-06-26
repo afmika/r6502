@@ -8,8 +8,8 @@ fn simple_compilation() {
         ; should be ignored
         ignored = 1 + %101 * ($ff - 3)      ; also ignored
         .byte "HELLO WORLD"                 
+        also_ignored:                       ; offset = 8 + 2 = 10 = $0a
         .dword "LLHH", $00ff
-        also_ignored:
         LDA ($ff), y                        ;  official
         NOP
         BNE also_ignored
@@ -18,9 +18,9 @@ fn simple_compilation() {
     compiler.init_source(&source).unwrap();
     let hex_string = compiler.to_hex_string().unwrap();
     let bytes = compiler.to_byte_code().unwrap();
-    assert_eq!(hex_string, "48 45 4c 4c 4f 20 57 4f 52 4c 44 4c 4c 48 48 ff 00 b1 ff ea d0 04");
+    assert_eq!(hex_string, "48 45 4c 4c 4f 20 57 4f 52 4c 44 4c 4c 48 48 ff 00 b1 ff ea d0 0a");
     assert_eq!(bytes, vec![
-        72, 69, 76, 76, 79, 32, 87, 79, 82, 76, 68, 76, 76, 72, 72, 255, 0, 177, 255, 234, 208, 4
+        72, 69, 76, 76, 79, 32, 87, 79, 82, 76, 68, 76, 76, 72, 72, 255, 0, 177, 255, 234, 208, 10
     ]);
 }
 
