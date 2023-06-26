@@ -47,3 +47,43 @@ fn compile_illegal() {
         171, 10, 177, 255, 218
     ]);
 }
+
+#[test]
+fn mode_and_math_expansion() {
+    let source =String::from(r##"
+        ; zp => ASL $BB => 06 ae
+        ASL $aa + 2 * %010
+
+        ; impl => ASL => 0a
+        ASL
+
+        ; abs => ASL $LLHH => 0e aa bb
+        ASL $bbaa + 2 * %010 - %100
+
+        ; zpx => ASL $BB, x => 16 ae
+        ASL $aa + 2 * %010, x
+
+        ; absx => ASL $LLHH,X => 1e ae 00
+        ASL $00aa + 2 * %010, x
+    "##);
+    let mut compiler = Compiler::new(None);
+    compiler.init_source(&source).unwrap();
+    let hex_string = compiler.to_hex_string().unwrap();
+    assert_eq!(hex_string, "06 ae 0a 0e aa bb 16 ae 1e ae 00");
+
+    // this test guarantees that it is possible
+    // to differentiate (math_expr) to ((math_expr))
+    // when context matters
+    let source =String::from(r##"
+        ; Note: although similar to the above example except the outer parenthesis, 
+        ; this will not work, it implies indirect y
+        ; which is is not supported by ASL
+        ASL ($aa + 2 * %010), y
+    "##);
+    let mut compiler = Compiler::new(None);
+    compiler.init_source(&source).unwrap();
+    match compiler.to_hex_string() {
+        Ok(_) => panic!("error was expected"),
+        Err(s) => assert_eq!(s, "instruction (ASL, INDY) does not exist")
+    }
+}

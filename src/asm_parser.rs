@@ -364,6 +364,17 @@ impl<'a> AsmParser<'a> {
         Ok(expr)
     }
 
+    fn try_expand_math(&mut self) -> Result<NumericValue, String> {
+        match self.consume_math_expr() {
+            Ok(expr) => self.eval_math(&expr),
+            Err(_) => {
+                let ret = canonicalize_number(self.curr())?;
+                self.next();
+                Ok(ret)
+            }
+        }
+    }
+
     // term      ::= factor (* | /) term | factor
     fn consume_math_term(&mut self) -> Result<MathExpr, String> {
         let expr = self.consume_math_factor()?;
@@ -547,16 +558,7 @@ impl<'a> AsmParser<'a> {
         if *self.curr() == Token::PARENTOPEN {
             // indirect
             self.consume(Token::PARENTOPEN)?;
-            // try expanding math expression if possible
-            let number = match self.consume_math_expr() {
-                Ok(expr) => self.eval_math(&expr)?,
-                Err(_) => {
-                    let ret = canonicalize_number(self.curr())?;
-                    self.next();
-                    ret
-                }
-            };
-            // let number = canonicalize_number(self.curr())?;
+            let number = self.try_expand_math()?;
             if number.size > 8 {
                 let op = Operand::VALUE(number);
                 self.consume(Token::PARENTCLOSE)?;
@@ -580,12 +582,11 @@ impl<'a> AsmParser<'a> {
         }
 
         // abs and zp
-        let number = canonicalize_number(self.curr())?;
+        let number = self.try_expand_math()?;
         if number.size > 8 {
             // abs
             let op = Operand::VALUE(number);
             let mut mode = AdrMode::ABS;
-            self.next();
             if *self.curr() == Token::COMMA {
                 self.consume(Token::COMMA)?;
                 match self.consume_literal("x") {
@@ -601,7 +602,6 @@ impl<'a> AsmParser<'a> {
             // zp
             let op = Operand::VALUE(number);
             let mut mode = AdrMode::ZP;
-            self.next();
             if *self.curr() == Token::COMMA {
                 self.consume(Token::COMMA)?;
                 match self.consume_literal("x") {
