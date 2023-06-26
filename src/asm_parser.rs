@@ -414,7 +414,7 @@ impl<'a> AsmParser<'a> {
     // expr should guarantee to be not recursive
     pub fn eval_math(&self, expr: &MathExpr) -> Result<NumericValue, String> {
         match expr {
-            MathExpr::BIN(op, rvalue, lvalue) => {
+            MathExpr::BIN(op, lvalue, rvalue) => {
                 let left = self.eval_math(&lvalue)?;
                 let right = self.eval_math(&rvalue)?;
                 let value = match op {
@@ -547,16 +547,22 @@ impl<'a> AsmParser<'a> {
         if *self.curr() == Token::PARENTOPEN {
             // indirect
             self.consume(Token::PARENTOPEN)?;
-
-            let number = canonicalize_number(self.curr())?;
+            // try expanding math expression if possible
+            let number = match self.consume_math_expr() {
+                Ok(expr) => self.eval_math(&expr)?,
+                Err(_) => {
+                    let ret = canonicalize_number(self.curr())?;
+                    self.next();
+                    ret
+                }
+            };
+            // let number = canonicalize_number(self.curr())?;
             if number.size > 8 {
                 let op = Operand::VALUE(number);
-                self.next();
                 self.consume(Token::PARENTCLOSE)?;
                 return Ok(Expr::INSTR(instr, AdrMode::IND, op));
             } else {
                 let op = Operand::VALUE(number);
-                self.next();
                 if *self.curr() == Token::COMMA {
                     // indirect x
                     self.consume(Token::COMMA)?;
@@ -584,7 +590,7 @@ impl<'a> AsmParser<'a> {
                 self.consume(Token::COMMA)?;
                 match self.consume_literal("x") {
                     Ok(_) =>  { mode = AdrMode::ABSX },
-                    Err(_) => { 
+                    Err(_) => {
                         self.consume_literal("y")?;
                         mode = AdrMode::ABSY;
                     }
@@ -600,7 +606,7 @@ impl<'a> AsmParser<'a> {
                 self.consume(Token::COMMA)?;
                 match self.consume_literal("x") {
                     Ok(_) =>  { mode = AdrMode::ZPX },
-                    Err(_) => { 
+                    Err(_) => {
                         self.consume_literal("y")?;
                         mode = AdrMode::ZPY;
                     }
