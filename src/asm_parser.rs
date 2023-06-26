@@ -42,6 +42,8 @@ pub enum Directive {
     BYTE(Vec<NumericValue>),
     /// .dw 1, 2, 3, ... (16 bits)
     DWORD(Vec<NumericValue>),
+    /// .res N_BYTES
+    RESERVE(usize)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -189,6 +191,19 @@ impl<'a> AsmParser<'a> {
                         "endproc" => {
                             self.next();
                             prog.push(Expr::DIRECTIVE(Directive::ENDPROC));
+                        },
+                        "res" => {
+                            self.next();
+                            match self.curr() {
+                                Token::DEC(n) => {
+                                    let size = usize::from_str_radix(&n, 10).unwrap();
+                                    self.next();
+                                    prog.push(Expr::DIRECTIVE(Directive::RESERVE(size)));
+                                },
+                                tk => {
+                                    return Err(format!("decimal number was expected, got {:?}", tk));
+                                }
+                            }
                         },
                         _ => {
                             return Err(self.curr_unexpected());
@@ -364,6 +379,17 @@ impl<'a> AsmParser<'a> {
         Ok(expr)
     }
 
+    fn try_expand_math(&mut self) -> Result<NumericValue, String> {
+        match self.consume_math_expr() {
+            Ok(expr) => self.eval_math(&expr),
+            Err(_) => {
+                let ret = canonicalize_number(self.curr())?;
+                self.next();
+                Ok(ret)
+            }
+        }
+    }
+
     // term      ::= factor (* | /) term | factor
     fn consume_math_term(&mut self) -> Result<MathExpr, String> {
         let expr = self.consume_math_factor()?;
@@ -414,7 +440,7 @@ impl<'a> AsmParser<'a> {
     // expr should guarantee to be not recursive
     pub fn eval_math(&self, expr: &MathExpr) -> Result<NumericValue, String> {
         match expr {
-            MathExpr::BIN(op, rvalue, lvalue) => {
+            MathExpr::BIN(op, lvalue, rvalue) => {
                 let left = self.eval_math(&lvalue)?;
                 let right = self.eval_math(&rvalue)?;
                 let value = match op {
@@ -511,7 +537,7 @@ impl<'a> AsmParser<'a> {
         self.next();
 
         // none
-        if *self.curr() == Token::NEWLINE || *self.curr() == Token::EOF {
+        if self.is_endline() || self.is_eof() || self.is_comment() {
             return Ok(Expr::INSTR(instr, AdrMode::IMPL, Operand::NONE));
         }
 
@@ -547,16 +573,13 @@ impl<'a> AsmParser<'a> {
         if *self.curr() == Token::PARENTOPEN {
             // indirect
             self.consume(Token::PARENTOPEN)?;
-
-            let number = canonicalize_number(self.curr())?;
+            let number = self.try_expand_math()?;
             if number.size > 8 {
                 let op = Operand::VALUE(number);
-                self.next();
                 self.consume(Token::PARENTCLOSE)?;
                 return Ok(Expr::INSTR(instr, AdrMode::IND, op));
             } else {
                 let op = Operand::VALUE(number);
-                self.next();
                 if *self.curr() == Token::COMMA {
                     // indirect x
                     self.consume(Token::COMMA)?;
@@ -574,17 +597,16 @@ impl<'a> AsmParser<'a> {
         }
 
         // abs and zp
-        let number = canonicalize_number(self.curr())?;
+        let number = self.try_expand_math()?;
         if number.size > 8 {
             // abs
             let op = Operand::VALUE(number);
             let mut mode = AdrMode::ABS;
-            self.next();
             if *self.curr() == Token::COMMA {
                 self.consume(Token::COMMA)?;
                 match self.consume_literal("x") {
                     Ok(_) =>  { mode = AdrMode::ABSX },
-                    Err(_) => { 
+                    Err(_) => {
                         self.consume_literal("y")?;
                         mode = AdrMode::ABSY;
                     }
@@ -595,12 +617,11 @@ impl<'a> AsmParser<'a> {
             // zp
             let op = Operand::VALUE(number);
             let mut mode = AdrMode::ZP;
-            self.next();
             if *self.curr() == Token::COMMA {
                 self.consume(Token::COMMA)?;
                 match self.consume_literal("x") {
                     Ok(_) =>  { mode = AdrMode::ZPX },
-                    Err(_) => { 
+                    Err(_) => {
                         self.consume_literal("y")?;
                         mode = AdrMode::ZPY;
                     }

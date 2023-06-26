@@ -3,5 +3,5 @@ DIRECTIVE(BYTE([NumericValue { value: 65, size: 8 }, NumericValue { value: 66, s
 LABEL("start")
 DIRECTIVE(BYTE([NumericValue { value: 68, size: 8 }, NumericValue { value: 69, size: 8 }]))
 DIRECTIVE(DWORD([NumericValue { value: 16706, size: 16 }, NumericValue { value: 65535, size: 16 }, NumericValue { value: 65, size: 16 }, NumericValue { value: 68, size: 16 }, NumericValue { value: 255, size: 16 }]))
-INSTR(LDA, IMM, VALUE(NumericValue { value: 65281, size: 16 }))
+INSTR(LDA, INDY, VALUE(NumericValue { value: 255, size: 8 }))
 DIRECTIVE(BYTE([NumericValue { value: 72, size: 8 }, NumericValue { value: 69, size: 8 }, NumericValue { value: 76, size: 8 }, NumericValue { value: 76, size: 8 }, NumericValue { value: 79, size: 8 }, NumericValue { value: 32, size: 8 }, NumericValue { value: 87, size: 8 }, NumericValue { value: 79, size: 8 }, NumericValue { value: 82, size: 8 }, NumericValue { value: 76, size: 8 }, NumericValue { value: 68, size: 8 }]))
