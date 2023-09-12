@@ -7,8 +7,10 @@ fn simple_compilation() {
     let source =String::from(r##"
         ; should be ignored
         ignored = 1 + %101 * ($ff - 3)      ; also ignored
-        .byte "HELLO WORLD"                 
-        also_ignored:                       ; offset = -(8 + 2) = -10 = -$0a = $f5 (cast to unsigned)
+        .byte "HELLO WORLD"
+
+        ; offset = -(8 + 2) = -10 = -$0a = $f5 + 1 since ~$0a = $f5              
+        also_ignored:
         .dword "LLHH", $00ff
         LDA ($ff), y                        ;  official
         NOP
@@ -19,9 +21,10 @@ fn simple_compilation() {
     let hex_string = compiler.to_hex_string().unwrap();
     let bytes = compiler.to_byte_code().unwrap();
     assert_eq!(hex_string, "48 45 4c 4c 4f 20 57 4f 52 4c 44 4c 4c 48 48 ff 00 b1 ff ea d0 f5");
+
     assert_eq!(bytes, vec![
         72, 69, 76, 76, 79, 32, 87, 79, 82, 76, 68, 76, 76, 72, 72, 255, 0, 177, 255, 234, 
-        208, 245 // given that $f5 (unsigned) == -$0a
+        208, 245
     ]);
 }
 
@@ -111,7 +114,7 @@ fn mode_and_math_expansion() {
     assert_eq!(hex_string, "06 ae 0a 0e aa bb 16 ae 1e ae 00");
 
     // this test guarantees that it is possible
-    // to differentiate (math_expr) to ((math_expr))
+    // to differentiate (math_expr) from ((math_expr))
     // when context matters
     let source =String::from(r##"
         ; Note: although similar to the above example except the outer parenthesis, 

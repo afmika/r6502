@@ -21,7 +21,7 @@ pub enum Token {
     HEX(String),        // \$[0-9abdef]+
     BIN(String),        // %[01]+
     STR(String),        // "(.*)"
-    CHAR(String),        // '.{1}'
+    CHAR(String),       // '.{1}'
     EOF
 }
 
@@ -143,10 +143,6 @@ impl AsmLexer {
         self.cursor = min(self.source.len(), self.cursor + 1);
         return self.curr();
     }
-
-    // fn prev(&mut self) -> &char {
-    //     return self.back(1);
-    // }
 
     fn back(&mut self, count: usize) -> &char {
         if self.cursor > (count - 1) {
